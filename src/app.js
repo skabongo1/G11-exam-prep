@@ -91,7 +91,7 @@ function feedback(q,sel){const ok=sel===q.a;return `<div class="fb ${ok?'good':'
  <details ${ok?'':'open'}><summary>Why each option is right or wrong</summary><ul>${q.o.map((o,j)=>`<li><b>${L4[j]}.</b> ${j===q.a?'Correct. ':''}${esc(q.w[j]||q.ex)}</li>`).join('')}</ul></details>
  <p class="ref"><b>Reference:</b> ${esc(q.r)}${q.p?' · page '+q.p:''} · <b>How to find it:</b> ${esc(q.f)}</p>${q.b==='IBC'||q.b==='CM'?`<div class="row"><button class="mini" data-openq="${q.id}">📖 Open in my ${q.b==='CM'?'Concrete Manual':'IBC'}</button></div>`:''}</div>`}
 function findKey(q){const r=q.r.replace(/^Concrete Manual\s*/,'');let m=r.match(/Table\s+[\d.]+/);if(m)return m[0];m=r.match(/^(\d+\.\d+)/);if(m)return m[1];m=r.match(/Ch\.\s*(\d+)/);if(m&&q.ch)return '';return q.f.split('→')[1]?q.f.split('→')[1].split(',').pop().trim():''}
-function openQ(q){if(q.b==='CM'){const k=findKey(q);const t=(q.f.match(/Chapter \d+, ([^→]+)/)||[])[1];G.READER.open('cm',{find:k||(t?t.trim():'')})}else G.READER.open('ibc',{printed:q.p?+q.p:null,find:q.p?'':(q.r.match(/[\d.]+/)||[''])[0]})}
+function openQ(q){if(q.b==='CM'){const k=findKey(q);const t=(q.f.match(/Chapter \d+, ([^→]+)/)||[])[1];G.READER.open('cm',{find:k||(t?t.trim():'')})}else G.READER.open('ibc',{printed:q.p?+q.p:null,ref:(q.r.match(/(?:Table\s+[\d.]+|§\s*[\d.]+)/)||[q.r])[0]})}
 function qCard(q,i,sel,o){o=o||{};const show=o.fb&&sel!=null;const bk=S.book.includes(q.id);
  return `<article class="q" data-q="${q.id}"><header class="qh"><span class="qn">Q${i+1}${o.total?' of '+o.total:''}</span>${qMeta(q)}</header><p class="qt">${esc(q.q)}</p>
  <div class="opts" role="group" aria-label="Answer options">${q.o.map((t,j)=>{let c='';if(show){if(j===q.a)c='right';else if(j===sel)c='wrong'}else if(sel===j)c='sel';

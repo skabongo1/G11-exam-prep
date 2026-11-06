@@ -905,7 +905,7 @@ G.GUIDES={view(m,api){const esc=api.esc;let tab=m._gt||'method';
    <div class="book">${G.TABPLAN.map(t=>`<div class="btab k${t.d}"><b>${esc(t.label.split(' · ')[0])}</b><span class="muted">${esc(t.label.split(' · ')[1]||'')}${t.page?' · p. '+t.page:''}</span></div>`).join('')}</div></section>
    <section class="card stack"><h2 class="h3">Highlighting guide (${D.G.length} chapters · ${n} marks)</h2>
    <div class="hlkey"><span class="hl y">Yellow: values and limits</span><span class="hl b">Blue: definitions</span><span class="hl p">Pink: exceptions</span><span class="hl g">Green: tables and section starts</span></div>
-   <div class="chg">${D.G.map(c=>`<details class="k${c[0]}"><summary><span>${esc(c[1])}</span><small>starts p. ${pageOf(c[1])||'—'} · ${c[2].length} marks</small></summary><ul>${c[2].map(i=>{const pp=pageOf(i[1]);return `<li><span class="sw ${i[0]}"></span><span><b class="mono">${esc(i[1])}</b>${pp?` <span class="muted small">p. ${pp}</span>`:''} · ${esc(i[2])}${pp?` <button class="mini" data-openp="${pp}">📖 Open</button>`:''}</span></li>`}).join('')}</ul></details>`).join('')}</div></section>`}
+   <div class="chg">${D.G.map(c=>`<details class="k${c[0]}"><summary><span>${esc(c[1])} <button class="mini" data-openp="${pageOf(c[1])||''}" data-ref="${esc(c[1].split(' · ')[0])}">📖 Open</button></span><small>starts p. ${pageOf(c[1])||'—'} · ${c[2].length} marks</small></summary><ul>${c[2].map(i=>{const pp=pageOf(i[1]);return `<li><span class="sw ${i[0]}"></span><span><b class="mono">${esc(i[1])}</b>${pp?` <span class="muted small">p. ${pp}</span>`:''} · ${esc(i[2])} <button class="mini" data-openp="${pp||''}" data-ref="${esc(i[1])}">📖 Open</button></span></li>`}).join('')}</ul></details>`).join('')}</div></section>`}
  else if(tab==='cm'){B.innerHTML=`<section class="card stack"><div class="callout ok"><b>Your edition:</b> Concrete Manual based on the 2021 IBC and ACI 318-19 (ICC sells it as "2024/2021"). The 2018 IBC itself references ACI 318-14; the cover values and the acceptance rule are the same in both.</div>
    <h2 class="h3">Table of contents and tab priority</h2><div class="tbl"><table><thead><tr><th>Ch.</th><th>Title</th><th>What G11 asks</th><th>Tab</th></tr></thead><tbody>${CMTOC.map(r=>`<tr${r[3]==='H'?' class="hi"':''}><td class="num">${r[0]}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td>${r[3]==='H'?'<b>Yes</b>':r[3]==='M'?'Maybe':'—'}</td></tr>`).join('')}</tbody></table></div></section>
    <section class="card stack"><h2 class="h3">Key values to highlight</h2><div class="tbl"><table><thead><tr><th>Topic</th><th>Rule</th><th>Where</th></tr></thead><tbody>${CMKEY.map(r=>`<tr><td><b>${esc(r[0])}</b></td><td>${esc(r[1])}</td><td class="mono">${esc(r[2])} <button class="mini" data-openf="${esc(r[2].split(',')[0].replace(/^Ch\. /,'Chapter '))}">📖</button></td></tr>`).join('')}</tbody></table></div>
@@ -914,7 +914,7 @@ G.GUIDES={view(m,api){const esc=api.esc;let tab=m._gt||'method';
    <div class="row wrap">${x.in.map(f=>`<div class="field sm"><label for="m${i}${f[0]}">${esc(f[1])}</label><input id="m${i}${f[0]}" type="number" step="any" value="${f[2]}" data-mi="${i}" data-k="${f[0]}"></div>`).join('')}</div><div class="out" id="mo${i}"></div></section>`).join('')}</div>`;
   const upd=i=>{const v={};MATH[i].in.forEach(f=>{v[f[0]]=parseFloat(m.querySelector('#m'+i+f[0]).value)||0});m.querySelector('#mo'+i).textContent='= '+MATH[i].calc(v)};
   MATH.forEach((x,i)=>upd(i));m.querySelectorAll('[data-mi]').forEach(e=>e.oninput=()=>upd(+e.dataset.mi))}
- m.querySelectorAll('[data-openp]').forEach(b=>b.onclick=()=>G.READER.open('ibc',{printed:+b.dataset.openp}));
+ m.querySelectorAll('[data-openp]').forEach(b=>b.onclick=()=>G.READER.open('ibc',{printed:b.dataset.openp?+b.dataset.openp:null,ref:b.dataset.ref}));
  m.querySelectorAll('[data-openf]').forEach(b=>b.onclick=()=>G.READER.open('cm',{find:b.dataset.openf}));
 }};
 })();
@@ -993,7 +993,7 @@ async function loadDoc(k,f){if(DOCS[k])return DOCS[k];const L=await lib();const 
 
 /* ---------- reader shell ---------- */
 function shell(m,k){const D=DOCS[k],b=A(k),N=D.doc.numPages;
- if(R.pending){const p=R.pending;R.pending=null;if(p.printed){b.last=Math.min(N,Math.max(1,pdfOf(k,+p.printed)));if(!b.offsetSet)API.toast('Set the page offset once so printed page numbers line up')}if(p.find){R.hitQ=p.find;setTimeout(()=>runSearch(m,k,p.find,true),50)}}
+ const pend=R.pending;R.pending=null;if(pend&&pend.printed&&(b.offsetSet||!pend.ref&&!pend.find))b.last=Math.min(N,Math.max(1,pdfOf(k,+pend.printed)));
  const page=Math.min(N,Math.max(1,b.last||1));b.last=page;
  $('#rdBody').innerHTML=`
  <div class="rd-tools card">
@@ -1038,6 +1038,8 @@ function shell(m,k){const D=DOCS[k],b=A(k),N=D.doc.numPages;
  st.addEventListener('touchend',e=>{if(R.mode!=='read'||R.zoom>1)return;const t=e.changedTouches[0];const dx=t.clientX-sx,dy=t.clientY-sy;if(Date.now()-t0<700&&Math.abs(dx)>60&&Math.abs(dy)<50)go(b.last+(dx<0?1:-1))},{passive:true});
  st.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key==='PageDown'){e.preventDefault();go(b.last+1)}if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();go(b.last-1)}});
  overlay(k);strip(k);panel(m,k);draw(k);
+ if(pend&&(pend.ref||pend.find))locate(k,pend);
+ else if(pend&&pend.printed&&!b.offsetSet)API.toast('Set the page offset once in Settings so printed page numbers line up');
  let rt;window.addEventListener('resize',function onr(){if(!document.getElementById('rdCv')){window.removeEventListener('resize',onr);return}clearTimeout(rt);rt=setTimeout(()=>draw(k),200)});
 }
 
@@ -1067,9 +1069,38 @@ function overlay(k){const ov=$('#rdOv');ov.dataset.mode=R.mode;let s=null,box=nu
   if(w<0.01&&h<0.004)return;const b=A(k);(b.hl[b.last]=b.hl[b.last]||[]).push({x:+x.toFixed(4),y:+y.toFixed(4),w:+w.toFixed(4),h:+Math.max(h,0.012).toFixed(4),c:R.color});API.save();paintHL(k);if(R.panel==='hl')panel(null,k)});
 }
 
+/* ---------- jump straight to a reference ---------- */
+function rx(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}
+function patterns(pend){let r=(pend.ref||pend.find||'').trim();let m;
+ if((m=r.match(/Tables?\s+(\d+(?:\.\d+)*)/i)))return {box:'TABLE '+m[1],strong:new RegExp('TABLE\\s+'+rx(m[1])+'(?![\\d.]*\\d)'),weak:new RegExp('Table\\s+'+rx(m[1])+'(?![\\d])','i')};
+ if((m=r.match(/^(?:§\s*)?(\d+\.\d+(?:\.\d+)*)/)))return {box:m[1],head:true,strong:new RegExp('(?:^|\\s)'+rx(m[1])+'\\s+[A-Z][a-z]'),weak:new RegExp('(?:^|[^\\d.])'+rx(m[1])+'(?![\\d]|\\.\\d)')};
+ if((m=r.match(/^§\s*(\d{3,4})\b/)))return {box:'SECTION '+m[1],strong:new RegExp('SECTION\\s+'+m[1]+'(?![\\d.])'),weak:new RegExp('Section\\s+'+m[1]+'(?![\\d.])','i')};
+ if((m=r.match(/^(?:Ch\.?|Chapter)\s*(\d+)/i)))return {box:'CHAPTER '+m[1],strong:new RegExp('CHAPTER\\s+'+m[1]+'(?!\\d)'),weak:new RegExp('Chapter\\s+'+m[1]+'(?!\\d)','i')};
+ if(!r)return null;return {box:r,text:true,strong:new RegExp(rx(r),'i'),weak:new RegExp(rx(r.split(/\s+/).slice(0,3).join(' ')),'i')}}
+async function locate(k,pend){const D=DOCS[k],b=A(k),N=D.doc.numPages;const P=patterns(pend);if(!P){return}
+ const label=pend.ref||pend.find;API.toast('Finding '+label+'…');const my=++R.searching;
+ const exp=pend.printed!=null&&pend.printed!==''?Math.min(N,Math.max(1,pdfOf(k,+pend.printed))):null;
+ const skip=Math.max(6,Math.floor(N*0.03));   // front matter and contents
+ let order=[];
+ if(exp!=null){const lo=b.offsetSet?exp-10:Math.max(1,+pend.printed-5),hi=b.offsetSet?exp+10:Math.min(N,+pend.printed+90);
+  const c=b.offsetSet?exp:Math.min(N,+pend.printed+12);for(let d=0;d<=Math.max(c-lo,hi-c);d++){if(c+d<=hi&&c+d>=1)order.push(c+d);if(d&&c-d>=lo&&c-d>=1)order.push(c-d)}}
+ const seen=new Set(order);for(let p=skip+1;p<=N;p++)if(!seen.has(p))order.push(p);for(let p=1;p<=skip;p++)if(!seen.has(p))order.push(p);
+ let strong=null,weak=null,i=0;const windowN=exp!=null?seen.size:0;
+ for(const p of order){if(my!==R.searching)return;i++;let t='';try{t=await pageText(k,p)}catch(e){}
+  if(P.strong.test(t)&&!(P.text&&p<=skip)){strong=p;break}
+  if(!weak&&P.weak.test(t)&&p>skip)weak=p;
+  if(windowN&&i===windowN&&weak)break;            // inside the expected window: settle for a cross-reference page
+  if(i%20===0)await new Promise(r=>setTimeout(r,0))}
+ const hit=strong||weak;
+ if(!hit){API.toast(label+' was not found in this file'+(exp?'; showing the expected page':''));if(exp)R.go(exp);return}
+ if(strong&&pend.printed&&!b.offsetSet&&!P.text){const off=hit-(+pend.printed);if(off>-10&&off<80){b.offset=off;b.offsetSet=true;API.save();API.toast('Found '+label+' · page numbers lined up automatically')}}
+ else API.toast((strong?'Found ':'Closest match for ')+label);
+ R.hitQ=P.box;R.hitHead=!!P.head;const inp=$('#rdQ');if(inp)inp.value=P.box;
+ b.last=hit;API.save();const pi=$('#rdPage');if(pi)pi.value=hit;R.scrollHit=true;await draw(k);panel(null,k)}
+
 /* ---------- search ---------- */
 async function pageText(k,p){const D=DOCS[k];if(D.text[p]!=null)return D.text[p];const pg=await D.doc.getPage(p);const tc=await pg.getTextContent();const t=tc.items.map(i=>i.str).join(' ').replace(/\s+/g,' ');D.text[p]=t;return t}
-async function runSearch(m,k,q,jump){const D=DOCS[k];const N=D.doc.numPages;const my=++R.searching;R.hitQ=q;R.hits=[];const ql=q.toLowerCase();
+async function runSearch(m,k,q,jump){R.hitHead=false;const D=DOCS[k];const N=D.doc.numPages;const my=++R.searching;R.hitQ=q;R.hits=[];const ql=q.toLowerCase();
  R.panel='find';document.querySelectorAll('[data-panel]').forEach(y=>y.setAttribute('aria-selected',y.dataset.panel==='find'));
  const stat=$('#rdSStat');let jumped=false;
  for(let p=1;p<=N;p++){if(my!==R.searching)return;let t='';try{t=await pageText(k,p)}catch(e){}
@@ -1081,9 +1112,9 @@ async function runSearch(m,k,q,jump){const D=DOCS[k];const N=D.doc.numPages;cons
  panel(null,k);draw(k)}
 async function paintHits(k,page,vp){const ov=$('#rdOv');if(!ov)return;ov.querySelectorAll('.rd-hit').forEach(x=>x.remove());if(!R.hitQ)return;
  const ql=R.hitQ.toLowerCase();const first=(ql.split(/\s+/).find(w=>w.length>=3)||ql);let tc;try{tc=await page.getTextContent()}catch(e){return}
- const L=await lib();let any=false;const items=tc.items.filter(i=>i.str&&i.str.toLowerCase().includes(ql));const use=items.length?items:tc.items.filter(i=>i.str&&i.str.toLowerCase().includes(first));
+ const L=await lib();let any=false;const starts=tc.items.filter(i=>i.str&&i.str.trim().toLowerCase().startsWith(ql));const items=starts.length?starts:tc.items.filter(i=>i.str&&i.str.toLowerCase().includes(ql));const use=items.length?items:tc.items.filter(i=>i.str&&i.str.toLowerCase().includes(first));
  use.slice(0,40).forEach(it=>{const tx=L.Util.transform(vp.transform,it.transform);const fh=Math.hypot(tx[2],tx[3]);const d=document.createElement('div');d.className='rd-hit';
-  d.style.cssText=`left:${tx[4]/vp.width*100}%;top:${(tx[5]-fh)/vp.height*100}%;width:${it.width*vp.scale/vp.width*100}%;height:${fh*1.15/vp.height*100}%`;ov.appendChild(d);any=true});}
+  d.style.cssText=`left:${tx[4]/vp.width*100}%;top:${(tx[5]-fh)/vp.height*100}%;width:${it.width*vp.scale/vp.width*100}%;height:${fh*1.15/vp.height*100}%`;ov.appendChild(d);if(R.scrollHit&&!any){R.scrollHit=false;try{d.scrollIntoView({block:'center',behavior:'smooth'})}catch(e){}}any=true});}
 
 /* ---------- tabs strip + side panel ---------- */
 function strip(k){const b=A(k);const el=$('#rdStrip');if(!el)return;const t=b.tabs.slice().sort((x,y)=>x.p-y.p);
@@ -1227,7 +1258,7 @@ function feedback(q,sel){const ok=sel===q.a;return `<div class="fb ${ok?'good':'
  <details ${ok?'':'open'}><summary>Why each option is right or wrong</summary><ul>${q.o.map((o,j)=>`<li><b>${L4[j]}.</b> ${j===q.a?'Correct. ':''}${esc(q.w[j]||q.ex)}</li>`).join('')}</ul></details>
  <p class="ref"><b>Reference:</b> ${esc(q.r)}${q.p?' · page '+q.p:''} · <b>How to find it:</b> ${esc(q.f)}</p>${q.b==='IBC'||q.b==='CM'?`<div class="row"><button class="mini" data-openq="${q.id}">📖 Open in my ${q.b==='CM'?'Concrete Manual':'IBC'}</button></div>`:''}</div>`}
 function findKey(q){const r=q.r.replace(/^Concrete Manual\s*/,'');let m=r.match(/Table\s+[\d.]+/);if(m)return m[0];m=r.match(/^(\d+\.\d+)/);if(m)return m[1];m=r.match(/Ch\.\s*(\d+)/);if(m&&q.ch)return '';return q.f.split('→')[1]?q.f.split('→')[1].split(',').pop().trim():''}
-function openQ(q){if(q.b==='CM'){const k=findKey(q);const t=(q.f.match(/Chapter \d+, ([^→]+)/)||[])[1];G.READER.open('cm',{find:k||(t?t.trim():'')})}else G.READER.open('ibc',{printed:q.p?+q.p:null,find:q.p?'':(q.r.match(/[\d.]+/)||[''])[0]})}
+function openQ(q){if(q.b==='CM'){const k=findKey(q);const t=(q.f.match(/Chapter \d+, ([^→]+)/)||[])[1];G.READER.open('cm',{find:k||(t?t.trim():'')})}else G.READER.open('ibc',{printed:q.p?+q.p:null,ref:(q.r.match(/(?:Table\s+[\d.]+|§\s*[\d.]+)/)||[q.r])[0]})}
 function qCard(q,i,sel,o){o=o||{};const show=o.fb&&sel!=null;const bk=S.book.includes(q.id);
  return `<article class="q" data-q="${q.id}"><header class="qh"><span class="qn">Q${i+1}${o.total?' of '+o.total:''}</span>${qMeta(q)}</header><p class="qt">${esc(q.q)}</p>
  <div class="opts" role="group" aria-label="Answer options">${q.o.map((t,j)=>{let c='';if(show){if(j===q.a)c='right';else if(j===sel)c='wrong'}else if(sel===j)c='sel';
@@ -1599,7 +1630,7 @@ route();
 <div id="upd" class="updbar" role="status" hidden><span>A new version of G11 Exam Prep is ready.</span><button class="btn sm" id="updGo">Update now</button></div>
 <style>.updbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:70;display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--paper);color:var(--ink);border:2px solid var(--d3);border-radius:12px;padding:10px 14px;max-width:calc(100% - 32px);box-shadow:0 6px 24px rgba(0,0,0,.25)}</style>
 <script>
-window.G11_APP_VERSION = "2026.11.06-1919";
+window.G11_APP_VERSION = "2026.11.06-2138";
 (function(){
   if(!('serviceWorker' in navigator)) return;
   var bar=document.getElementById('upd'), refreshing=false;

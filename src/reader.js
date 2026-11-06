@@ -70,7 +70,7 @@ async function loadDoc(k,f){if(DOCS[k])return DOCS[k];const L=await lib();const 
 
 /* ---------- reader shell ---------- */
 function shell(m,k){const D=DOCS[k],b=A(k),N=D.doc.numPages;
- if(R.pending){const p=R.pending;R.pending=null;if(p.printed){b.last=Math.min(N,Math.max(1,pdfOf(k,+p.printed)));if(!b.offsetSet)API.toast('Set the page offset once so printed page numbers line up')}if(p.find){R.hitQ=p.find;setTimeout(()=>runSearch(m,k,p.find,true),50)}}
+ const pend=R.pending;R.pending=null;if(pend&&pend.printed&&(b.offsetSet||!pend.ref&&!pend.find))b.last=Math.min(N,Math.max(1,pdfOf(k,+pend.printed)));
  const page=Math.min(N,Math.max(1,b.last||1));b.last=page;
  $('#rdBody').innerHTML=`
  <div class="rd-tools card">
@@ -115,6 +115,8 @@ function shell(m,k){const D=DOCS[k],b=A(k),N=D.doc.numPages;
  st.addEventListener('touchend',e=>{if(R.mode!=='read'||R.zoom>1)return;const t=e.changedTouches[0];const dx=t.clientX-sx,dy=t.clientY-sy;if(Date.now()-t0<700&&Math.abs(dx)>60&&Math.abs(dy)<50)go(b.last+(dx<0?1:-1))},{passive:true});
  st.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key==='PageDown'){e.preventDefault();go(b.last+1)}if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();go(b.last-1)}});
  overlay(k);strip(k);panel(m,k);draw(k);
+ if(pend&&(pend.ref||pend.find))locate(k,pend);
+ else if(pend&&pend.printed&&!b.offsetSet)API.toast('Set the page offset once in Settings so printed page numbers line up');
  let rt;window.addEventListener('resize',function onr(){if(!document.getElementById('rdCv')){window.removeEventListener('resize',onr);return}clearTimeout(rt);rt=setTimeout(()=>draw(k),200)});
 }
 
@@ -144,9 +146,38 @@ function overlay(k){const ov=$('#rdOv');ov.dataset.mode=R.mode;let s=null,box=nu
   if(w<0.01&&h<0.004)return;const b=A(k);(b.hl[b.last]=b.hl[b.last]||[]).push({x:+x.toFixed(4),y:+y.toFixed(4),w:+w.toFixed(4),h:+Math.max(h,0.012).toFixed(4),c:R.color});API.save();paintHL(k);if(R.panel==='hl')panel(null,k)});
 }
 
+/* ---------- jump straight to a reference ---------- */
+function rx(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}
+function patterns(pend){let r=(pend.ref||pend.find||'').trim();let m;
+ if((m=r.match(/Tables?\s+(\d+(?:\.\d+)*)/i)))return {box:'TABLE '+m[1],strong:new RegExp('TABLE\\s+'+rx(m[1])+'(?![\\d.]*\\d)'),weak:new RegExp('Table\\s+'+rx(m[1])+'(?![\\d])','i')};
+ if((m=r.match(/^(?:§\s*)?(\d+\.\d+(?:\.\d+)*)/)))return {box:m[1],head:true,strong:new RegExp('(?:^|\\s)'+rx(m[1])+'\\s+[A-Z][a-z]'),weak:new RegExp('(?:^|[^\\d.])'+rx(m[1])+'(?![\\d]|\\.\\d)')};
+ if((m=r.match(/^§\s*(\d{3,4})\b/)))return {box:'SECTION '+m[1],strong:new RegExp('SECTION\\s+'+m[1]+'(?![\\d.])'),weak:new RegExp('Section\\s+'+m[1]+'(?![\\d.])','i')};
+ if((m=r.match(/^(?:Ch\.?|Chapter)\s*(\d+)/i)))return {box:'CHAPTER '+m[1],strong:new RegExp('CHAPTER\\s+'+m[1]+'(?!\\d)'),weak:new RegExp('Chapter\\s+'+m[1]+'(?!\\d)','i')};
+ if(!r)return null;return {box:r,text:true,strong:new RegExp(rx(r),'i'),weak:new RegExp(rx(r.split(/\s+/).slice(0,3).join(' ')),'i')}}
+async function locate(k,pend){const D=DOCS[k],b=A(k),N=D.doc.numPages;const P=patterns(pend);if(!P){return}
+ const label=pend.ref||pend.find;API.toast('Finding '+label+'…');const my=++R.searching;
+ const exp=pend.printed!=null&&pend.printed!==''?Math.min(N,Math.max(1,pdfOf(k,+pend.printed))):null;
+ const skip=Math.max(6,Math.floor(N*0.03));   // front matter and contents
+ let order=[];
+ if(exp!=null){const lo=b.offsetSet?exp-10:Math.max(1,+pend.printed-5),hi=b.offsetSet?exp+10:Math.min(N,+pend.printed+90);
+  const c=b.offsetSet?exp:Math.min(N,+pend.printed+12);for(let d=0;d<=Math.max(c-lo,hi-c);d++){if(c+d<=hi&&c+d>=1)order.push(c+d);if(d&&c-d>=lo&&c-d>=1)order.push(c-d)}}
+ const seen=new Set(order);for(let p=skip+1;p<=N;p++)if(!seen.has(p))order.push(p);for(let p=1;p<=skip;p++)if(!seen.has(p))order.push(p);
+ let strong=null,weak=null,i=0;const windowN=exp!=null?seen.size:0;
+ for(const p of order){if(my!==R.searching)return;i++;let t='';try{t=await pageText(k,p)}catch(e){}
+  if(P.strong.test(t)&&!(P.text&&p<=skip)){strong=p;break}
+  if(!weak&&P.weak.test(t)&&p>skip)weak=p;
+  if(windowN&&i===windowN&&weak)break;            // inside the expected window: settle for a cross-reference page
+  if(i%20===0)await new Promise(r=>setTimeout(r,0))}
+ const hit=strong||weak;
+ if(!hit){API.toast(label+' was not found in this file'+(exp?'; showing the expected page':''));if(exp)R.go(exp);return}
+ if(strong&&pend.printed&&!b.offsetSet&&!P.text){const off=hit-(+pend.printed);if(off>-10&&off<80){b.offset=off;b.offsetSet=true;API.save();API.toast('Found '+label+' · page numbers lined up automatically')}}
+ else API.toast((strong?'Found ':'Closest match for ')+label);
+ R.hitQ=P.box;R.hitHead=!!P.head;const inp=$('#rdQ');if(inp)inp.value=P.box;
+ b.last=hit;API.save();const pi=$('#rdPage');if(pi)pi.value=hit;R.scrollHit=true;await draw(k);panel(null,k)}
+
 /* ---------- search ---------- */
 async function pageText(k,p){const D=DOCS[k];if(D.text[p]!=null)return D.text[p];const pg=await D.doc.getPage(p);const tc=await pg.getTextContent();const t=tc.items.map(i=>i.str).join(' ').replace(/\s+/g,' ');D.text[p]=t;return t}
-async function runSearch(m,k,q,jump){const D=DOCS[k];const N=D.doc.numPages;const my=++R.searching;R.hitQ=q;R.hits=[];const ql=q.toLowerCase();
+async function runSearch(m,k,q,jump){R.hitHead=false;const D=DOCS[k];const N=D.doc.numPages;const my=++R.searching;R.hitQ=q;R.hits=[];const ql=q.toLowerCase();
  R.panel='find';document.querySelectorAll('[data-panel]').forEach(y=>y.setAttribute('aria-selected',y.dataset.panel==='find'));
  const stat=$('#rdSStat');let jumped=false;
  for(let p=1;p<=N;p++){if(my!==R.searching)return;let t='';try{t=await pageText(k,p)}catch(e){}
@@ -158,9 +189,9 @@ async function runSearch(m,k,q,jump){const D=DOCS[k];const N=D.doc.numPages;cons
  panel(null,k);draw(k)}
 async function paintHits(k,page,vp){const ov=$('#rdOv');if(!ov)return;ov.querySelectorAll('.rd-hit').forEach(x=>x.remove());if(!R.hitQ)return;
  const ql=R.hitQ.toLowerCase();const first=(ql.split(/\s+/).find(w=>w.length>=3)||ql);let tc;try{tc=await page.getTextContent()}catch(e){return}
- const L=await lib();let any=false;const items=tc.items.filter(i=>i.str&&i.str.toLowerCase().includes(ql));const use=items.length?items:tc.items.filter(i=>i.str&&i.str.toLowerCase().includes(first));
+ const L=await lib();let any=false;const starts=tc.items.filter(i=>i.str&&i.str.trim().toLowerCase().startsWith(ql));const items=starts.length?starts:tc.items.filter(i=>i.str&&i.str.toLowerCase().includes(ql));const use=items.length?items:tc.items.filter(i=>i.str&&i.str.toLowerCase().includes(first));
  use.slice(0,40).forEach(it=>{const tx=L.Util.transform(vp.transform,it.transform);const fh=Math.hypot(tx[2],tx[3]);const d=document.createElement('div');d.className='rd-hit';
-  d.style.cssText=`left:${tx[4]/vp.width*100}%;top:${(tx[5]-fh)/vp.height*100}%;width:${it.width*vp.scale/vp.width*100}%;height:${fh*1.15/vp.height*100}%`;ov.appendChild(d);any=true});}
+  d.style.cssText=`left:${tx[4]/vp.width*100}%;top:${(tx[5]-fh)/vp.height*100}%;width:${it.width*vp.scale/vp.width*100}%;height:${fh*1.15/vp.height*100}%`;ov.appendChild(d);if(R.scrollHit&&!any){R.scrollHit=false;try{d.scrollIntoView({block:'center',behavior:'smooth'})}catch(e){}}any=true});}
 
 /* ---------- tabs strip + side panel ---------- */
 function strip(k){const b=A(k);const el=$('#rdStrip');if(!el)return;const t=b.tabs.slice().sort((x,y)=>x.p-y.p);
