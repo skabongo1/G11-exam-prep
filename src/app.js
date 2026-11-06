@@ -20,7 +20,7 @@ const dayFromISO=s=>{if(!s)return null;const t=Date.parse(s+'T00:00:00Z');return
 /* ---------------- state ---------------- */
 const KEY='g11prep.v1';
 const blank=()=>({v:1,created:Date.now(),theme:'system',profile:{onboarded:false,examDate:'',jur:'',ibc:'2018',cm:'',level:'',hours:10,days:[1,2,3,4,5]},
- diag:null,plan:null,lessons:{},att:{},book:[],missed:[],notes:{},lookups:[],scen:{},runs:[],run:null,lastUsed:{},cards:{},custom:[],log:[],pend:null,books:{},series:[]});
+ diag:null,plan:null,lessons:{},att:{},book:[],missed:[],notes:{},lookups:[],scen:{},runs:[],run:null,lastUsed:{},cards:{},custom:[],log:[],pend:null,books:{},series:[],fx:true,examMark:true});
 let S;
 function load(){try{const r=localStorage.getItem(KEY);S=r?Object.assign(blank(),JSON.parse(r)):blank()}catch(e){S=blank()}}
 let saveT=null;
@@ -92,11 +92,12 @@ function feedback(q,sel){const ok=sel===q.a;return `<div class="fb ${ok?'good':'
  <p class="ref"><b>Reference:</b> ${esc(q.r)}${q.p?' · page '+q.p:''} · <b>How to find it:</b> ${esc(q.f)}</p>${q.b==='IBC'||q.b==='CM'?`<div class="row"><button class="mini" data-openq="${q.id}">📖 Open in my ${q.b==='CM'?'Concrete Manual':'IBC'}</button></div>`:''}</div>`}
 function findKey(q){const r=q.r.replace(/^Concrete Manual\s*/,'');let m=r.match(/Table\s+[\d.]+/);if(m)return m[0];m=r.match(/^(\d+\.\d+)/);if(m)return m[1];m=r.match(/Ch\.\s*(\d+)/);if(m&&q.ch)return '';return q.f.split('→')[1]?q.f.split('→')[1].split(',').pop().trim():''}
 function openQ(q){if(q.b==='CM'){const k=findKey(q);const t=(q.f.match(/Chapter \d+, ([^→]+)/)||[])[1];G.READER.open('cm',{find:k||(t?t.trim():'')})}else G.READER.open('ibc',{printed:q.p?+q.p:null,ref:(q.r.match(/(?:Table\s+[\d.]+|§\s*[\d.]+)/)||[q.r])[0]})}
-function qCard(q,i,sel,o){o=o||{};const show=o.fb&&sel!=null;const bk=S.book.includes(q.id);
+function celebrate(scope,qid,o){const q=QBY[qid];if(!q||!scope)return;window.G11FX.off=S.fx===false;const card=scope.querySelector(`.q[data-q="${qid}"]`)||scope;const b=card.querySelector(`.opt[data-o="${o}"]`);if(o===q.a)window.G11FX.right(b);else{window.G11FX.wrong(b);const ok=card.querySelector(`.opt[data-o="${q.a}"]`);if(ok)ok.classList.add('fx-reveal')}}
+function qCard(q,i,sel,o){o=o||{};const show=(o.fb||o.mark)&&sel!=null;const bk=S.book.includes(q.id);
  return `<article class="q" data-q="${q.id}"><header class="qh"><span class="qn">Q${i+1}${o.total?' of '+o.total:''}</span>${qMeta(q)}</header><p class="qt">${esc(q.q)}</p>
  <div class="opts" role="group" aria-label="Answer options">${q.o.map((t,j)=>{let c='';if(show){if(j===q.a)c='right';else if(j===sel)c='wrong'}else if(sel===j)c='sel';
   return `<button class="opt ${c}" data-o="${j}" ${show?'disabled':''} aria-pressed="${sel===j}"><span class="lt">${L4[j]}</span><span>${esc(t)}</span></button>`}).join('')}</div>
- ${show?feedback(q,sel):''}
+ ${show&&o.fb?feedback(q,sel):''}
  <div class="qtools"><button class="mini" data-bk="${q.id}" aria-pressed="${bk}">${bk?'★ Bookmarked':'☆ Bookmark'}</button>${o.notes!==false?`<button class="mini" data-note="q:${q.id}">${S.notes['q:'+q.id]?'✎ Edit note':'✎ Add note'}</button>`:''}</div>
  <div class="notebox" data-nb="q:${q.id}" hidden></div></article>`}
 document.addEventListener('click',e=>{const oq=e.target.closest('[data-openq]');if(oq){const q=QBY[oq.dataset.openq];if(q)openQ(q);return}
@@ -183,10 +184,10 @@ function drawWeighted(n,pool){const per={};let tot=0;[1,2,3,4].forEach(d=>{per[d
 function startRun(kind,qids,secs,label){S.run={kind,label,qids,ans:{},flags:[],start:Date.now(),dur:secs||null,cur:0,tpq:{},enter:Date.now()};save()}
 function runView(m,backHref){const R=S.run;if(!R)return;R.enter=Date.now();const q=QBY[R.qids[R.cur]];const fl=R.flags.includes(R.cur);const un=R.qids.length-Object.keys(R.ans).length;
  m.innerHTML=`<div class="runbar" role="region" aria-label="${esc(R.label)} controls"><span><b>${esc(R.label)}</b> · ${R.cur+1}/${R.qids.length} · ${R.qids.length-un} answered</span>${R.dur?`<span class="clock" id="clk" aria-live="off"></span>`:''}<span class="row"><a class="btn sm inv" href="#reader" title="Look it up in your books; the clock keeps running">📖 Books</a><button class="btn sm inv" id="rFlag" aria-pressed="${fl}">${fl?'Unflag':'Flag'} (F)</button><button class="btn sm inv" id="rEnd">Submit</button></span></div>
- <div id="rConf"></div>${qCard(q,R.cur,R.ans[R.cur],{fb:false,total:R.qids.length,notes:false})}
+ <div id="rConf"></div>${qCard(q,R.cur,R.ans[R.cur],{fb:false,mark:S.examMark!==false,total:R.qids.length,notes:false})}
  <div class="row between"><button class="btn" id="rPrev" ${R.cur===0?'disabled':''}>← Previous (P)</button><button class="btn" id="rNF">Next flagged</button><button class="btn primary" id="rNext" ${R.cur===R.qids.length-1?'disabled':''}>Next (N) →</button></div>
- <div class="card stack"><h2 class="h3">Question navigator</h2><div class="qgrid">${R.qids.map((id,i)=>`<button class="qg ${R.ans[i]!=null?'ans':''} ${R.flags.includes(i)?'flag':''} ${i===R.cur?'cur':''}" data-g="${i}" aria-label="Question ${i+1}${R.ans[i]!=null?', answered':', unanswered'}${R.flags.includes(i)?', flagged':''}">${i+1}</button>`).join('')}</div><p class="fine">Blue: answered · red dot: flagged · outline: current. Keys 1–4 or A–D choose an answer. Answers stay hidden until you submit.</p></div>`;
- m.querySelector('.opts').addEventListener('click',e=>{const b=e.target.closest('.opt');if(!b)return;R.ans[R.cur]=+b.dataset.o;save();rgo(m,backHref,R.cur)});
+ <div class="card stack"><h2 class="h3">Question navigator</h2><div class="qgrid">${R.qids.map((id,i)=>`<button class="qg ${R.ans[i]!=null?'ans':''} ${R.flags.includes(i)?'flag':''} ${i===R.cur?'cur':''}" data-g="${i}" aria-label="Question ${i+1}${R.ans[i]!=null?', answered':', unanswered'}${R.flags.includes(i)?', flagged':''}">${i+1}</button>`).join('')}</div><p class="fine">Blue: answered · red dot: flagged · outline: current. Keys 1–4 or A–D choose an answer. ${S.examMark!==false?'Right and wrong show as you answer; the explanations come after you submit. Turn this off in Data &amp; settings for a realistic final rehearsal.':'Answers stay hidden until you submit.'}</p></div>`;
+ m.querySelector('.opts').addEventListener('click',e=>{const b=e.target.closest('.opt');if(!b||b.disabled)return;const o=+b.dataset.o;R.ans[R.cur]=o;save();const qid=R.qids[R.cur];rgo(m,backHref,R.cur);if(S.examMark!==false)celebrate(m,qid,o)});
  $('#rPrev').onclick=()=>rgo(m,backHref,R.cur-1);$('#rNext').onclick=()=>rgo(m,backHref,R.cur+1);
  $('#rNF').onclick=()=>{const f=R.flags.filter(i=>i>R.cur).concat(R.flags.filter(i=>i<=R.cur))[0];if(f!=null)rgo(m,backHref,f);else toast('No flagged questions')};
  $('#rFlag').onclick=()=>{R.flags=fl?R.flags.filter(i=>i!==R.cur):[...R.flags,R.cur];save();rgo(m,backHref,R.cur)};
@@ -278,7 +279,7 @@ function vLesson(m,id){const l=LBY[id];const md=G.MODULES.find(x=>x.id===l.mod);
  $('#lq').onclick=e=>{const b=e.target.closest('.opt');if(!b||b.disabled)return;const card=b.closest('.q');const qid=card.dataset.q;const o=+b.dataset.o;const ms=Date.now()-t0;t0=Date.now();
   rec(qid,o,'lesson',ms);S.lessons[id].ans=Object.assign({},S.lessons[id].ans,{[qid]:o});
   if(Object.keys(S.lessons[id].ans).length===qs.length&&!S.lessons[id].done){S.lessons[id].done=true;autoDone('lesson',id);const c=qs.filter(q=>S.lessons[id].ans[q.id]===q.a).length;log('lesson','Lesson '+id+' quiz',pct(c,qs.length));toast('Lesson complete');$('#lDone').textContent='Lesson complete ✓'}
-  save();const k=qs.findIndex(q=>q.id===qid);card.outerHTML=qCard(QBY[qid],k,o,{fb:true});say(o===QBY[qid].a?'Correct':'Incorrect')};
+  save();const k=qs.findIndex(q=>q.id===qid);card.outerHTML=qCard(QBY[qid],k,o,{fb:true});celebrate($('#lq'),qid,o);say(o===QBY[qid].a?'Correct':'Incorrect')};
  $('#lDone').onclick=()=>{S.lessons[id].done=true;autoDone('lesson',id);save();$('#lDone').textContent='Lesson complete ✓'}}
 
 /* ---------- Practice ---------- */
@@ -305,7 +306,7 @@ function vPractice(m){if(S.run&&(S.run.kind==='quiz')){if(S.run.done)return resu
 function studyList(el,ids,mode,onDone){const ans={};let t0=Date.now();
  const render=()=>{el.innerHTML=ids.map((id,i)=>qCard(QBY[id],i,ans[i],{fb:true,total:ids.length})).join('')+(Object.keys(ans).length===ids.length?`<div class="card"><b>Set complete: ${pct(ids.filter((id,i)=>ans[i]===QBY[id].a).length,ids.length)}%</b></div>`:'')};
  render();el.onclick=e=>{const b=e.target.closest('.opt');if(!b||b.disabled)return;const card=b.closest('.q');const i=ids.indexOf(card.dataset.q);const o=+b.dataset.o;rec(ids[i],o,mode,Date.now()-t0);t0=Date.now();ans[i]=o;
-  card.outerHTML=qCard(QBY[ids[i]],i,o,{fb:true,total:ids.length});say(o===QBY[ids[i]].a?'Correct':'Incorrect');
+  card.outerHTML=qCard(QBY[ids[i]],i,o,{fb:true,total:ids.length});celebrate(el,ids[i],o);say(o===QBY[ids[i]].a?'Correct':'Incorrect');
   if(Object.keys(ans).length===ids.length){const p=pct(ids.filter((id,k)=>ans[k]===QBY[id].a).length,ids.length);log(mode==='review'?'review':'practice',(mode==='review'?'Missed-question review':'Study set')+' ('+ids.length+' Q)',p);onDone&&onDone();el.insertAdjacentHTML('beforeend',`<div class="card"><b>Set complete: ${p}%</b></div>`)}}}
 
 /* ---------- Scenarios ---------- */
@@ -328,7 +329,7 @@ function vScn(m,id){const sc=SBY[id];let seed=(m._seed&&m._sid===id)?m._seed:Mat
   const lab=x.k==='multi'?'3 · Identify':(/reference|section/i.test(x.q)?'4 · Reference':(x.k==='num'?'5 · Calculate':'Decide'));
   if(x.k==='choice'){box.innerHTML=`<div class="eyebrow">${lab} · step ${n} of ${V.steps.length}</div><h2 class="h3">${x.q}</h2><div class="opts">${x.o.map((o,j)=>`<button class="opt" data-j="${j}"><span class="lt">${L4[j]}</span><span>${o.t}</span></button>`).join('')}</div><div id="sfb" aria-live="polite"></div>`;
    box.querySelector('.opts').onclick=e=>{const b=e.target.closest('.opt');if(!b||b.disabled)return;const o=x.o[+b.dataset.j];tries++;if(o.ok&&tries===1)first++;
-    b.classList.add(o.ok?'right':'wrong');if(o.ok)box.querySelectorAll('.opt').forEach(z=>z.disabled=true);else b.disabled=true;
+    b.classList.add(o.ok?'right':'wrong');window.G11FX.off=S.fx===false;o.ok?window.G11FX.right(b):window.G11FX.wrong(b);if(o.ok)box.querySelectorAll('.opt').forEach(z=>z.disabled=true);else b.disabled=true;
     $('#sfb').innerHTML=`<div class="fb ${o.ok?'good':'bad'}"><b>${o.ok?'Correct.':'Not quite.'}</b> ${o.fb}${o.ok?'':' Try again.'}</div>${o.ok?'<div class="row"><button class="btn primary" id="snext">Continue</button></div>':''}`;
     if(o.ok){$('#snext').onclick=()=>{step++;renderStep()};$('#snext').focus()}}}
   else if(x.k==='multi'){box.innerHTML=`<div class="eyebrow">${lab} · step ${n} of ${V.steps.length}</div><h2 class="h3">${x.q}</h2><div class="stack">${x.items.map((it,j)=>`<label class="chk big"><input type="checkbox" data-j="${j}"> ${esc(it.t)}</label>`).join('')}</div><div class="row"><button class="btn primary" id="mchk">Check</button></div><div id="sfb" aria-live="polite"></div>`;
@@ -378,10 +379,10 @@ function canDraw(n){const per=quotas(n);return [1,2,3,4].every(d=>VER.filter(q=>
 function vExam(m){if(S.run&&S.run.kind==='exam'){if(S.run.done)return resultView(m,'exam','all');return runView(m,'exam')}
  const SER=G.SERIES||[];const hist=S.runs.filter(r=>r.kind==='exam');const best=id=>{const h=hist.filter(r=>r.ser===id);return h.length?Math.max(...h.map(r=>r.p)):null};
  const gen=[[20,'Quick exam'],[45,'Half-length exam'],[90,'Full-length exam']];
- m.innerHTML=`${head('Practice exams','Verified questions only, weighted by the official outline (19 / 31 / 42 / 8). Timed at the real pace: 4 hours for 90 questions. Answers stay hidden until you submit.')}
+ m.innerHTML=`${head('Practice exams','Verified questions only, weighted by the official outline (19 / 31 / 42 / 8). Timed at the real pace: 4 hours for 90 questions. Explanations come after you submit.')}
  <section class="card stack"><h2>Mock exam series</h2><p class="muted">${SER.length} fixed full-length exams. No question appears in more than one mock, and each mock covers every subtopic in the official outline. Retake a mock to measure progress on the same set.</p>
  <div class="grid3">${SER.map(x=>{const b=best(x.id);const n=hist.filter(r=>r.ser===x.id).length;return `<div class="mock-card"><div class="eyebrow">${x.qids.length} questions · ${fmtT(x.qids.length*SEC_PER_Q)}</div><h3>${esc(x.title)}</h3><p class="muted">${n?`Taken ${n}× · best ${b}%`:'Not taken yet'}</p><button class="btn primary" data-ser="${x.id}">Start ${esc(x.title)}</button></div>`}).join('')}</div></section>
- <section class="card stack series"><div class="vh"><div><div class="eyebrow">Unlimited · full length</div><h2>Exam series</h2><p class="muted">Each new series is a fresh 90-question exam at the official weights (≈ 17 permits · 28 life safety · 38 structural · 7 envelope), spread across every subtopic, with the real 4-hour (240-minute) clock. Questions you have never seen come first, so each series pushes you through more of the bank. Answers stay hidden until you submit.</p></div></div>
+ <section class="card stack series"><div class="vh"><div><div class="eyebrow">Unlimited · full length</div><h2>Exam series</h2><p class="muted">Each new series is a fresh 90-question exam at the official weights (≈ 17 permits · 28 life safety · 38 structural · 7 envelope), spread across every subtopic, with the real 4-hour (240-minute) clock. Questions you have never seen come first, so each series pushes you through more of the bank. ${S.examMark!==false?'Right and wrong show as you answer (change this in Data &amp; settings).':'Answers stay hidden until you submit.'}</p></div></div>
   ${(()=>{const un=VER.filter(q=>!seenQ(q.id)).length;return `<div class="grid3"><div class="stat"><span class="lab">Question bank</span><b>${VER.length}</b><span class="muted">${VER.filter(q=>q.b==='IBC').length} IBC · ${VER.filter(q=>q.b==='CM').length} Concrete Manual · ${VER.filter(q=>q.b==='MATH').length} calculation</span></div><div class="stat"><span class="lab">Not seen yet</span><b>${un}</b><span class="muted">${Math.round((1-un/VER.length)*100)}% of the bank seen</span></div><div class="stat"><span class="lab">Series made</span><b>${(S.series||[]).length}</b><span class="muted">plus Mock Exams 1–3</span></div></div>`})()}
   <div class="row"><button class="btn primary big" id="serNew">Start new series #${3+(S.series||[]).length+1} · 90 questions · 4:00:00</button></div>
   ${(S.series||[]).length?`<details><summary>Retake an earlier series</summary><ul class="plain">${S.series.slice().reverse().map(x=>{const h=hist.filter(r=>r.ser==='X'+x.no);return `<li class="row between"><span>Series #${x.no} · ${new Date(x.at).toLocaleDateString()} · ${h.length?'best '+Math.max(...h.map(r=>r.p))+'%':'not finished'}</span><button class="btn sm" data-xser="${x.no}">Take again</button></li>`}).join('')}</ul></details>`:''}
@@ -437,11 +438,18 @@ function vLocal(m){const L=G.LOCAL;m.innerHTML=`<nav class="crumbs"><a href="#in
 /* ---------- Data & settings ---------- */
 function vData(m){m.innerHTML=`${head('Data and settings','Progress is saved in this browser. Export a copy to move it or keep a backup.')}
  <section class="card stack"><h2 class="h3">Appearance</h2><div class="seg" role="radiogroup" aria-label="Theme">${[['system','Match system'],['light','Light'],['dark','Dark']].map(t=>`<button role="radio" aria-checked="${S.theme===t[0]}" data-th="${t[0]}">${t[1]}</button>`).join('')}</div></section>
+ <section class="card stack"><h2 class="h3">Answer effects</h2>
+  <label class="chk big"><input type="checkbox" id="setFx" ${S.fx!==false?'checked':''}> Fireworks when you get it right, shake when it's wrong</label>
+  <label class="chk big"><input type="checkbox" id="setMark" ${S.examMark!==false?'checked':''}> Show right and wrong as you answer in timed exams</label>
+  <p class="muted small">Turn the second one off for a realistic exam rehearsal where you only see your score at the end. Once an exam answer is shown, it is locked.</p>
+  <div class="row"><button class="btn sm" id="setTry">Try the fireworks</button></div></section>
  <section class="card stack"><h2 class="h3">Export progress</h2><p class="muted">Copy this text and save it somewhere safe (a note or email to yourself).</p><div class="row"><button class="btn" id="exMk">Show export</button><button class="btn" id="exCp" hidden>Copy to clipboard</button></div><textarea id="exT" rows="5" readonly hidden aria-label="Exported progress"></textarea></section>
  <section class="card stack"><h2 class="h3">Import progress</h2><p class="muted">Choose an exported file or paste exported text. This replaces your current progress.</p><div class="field"><label for="imF">File</label><input id="imF" type="file" accept=".json,.txt,application/json,text/plain"></div><div class="field"><label for="imT">Or paste</label><textarea id="imT" rows="4"></textarea></div><div class="row"><button class="btn" id="imGo">Import</button></div><div id="imC"></div></section>
  <section class="card stack danger"><h2 class="h3">Reset all progress</h2><p>This deletes your profile, plan, answers, notes, bookmarks, flashcard history and exam results in this browser. It cannot be undone. Export first if you might want it back.</p><div class="field"><label for="rsT">Type RESET to confirm</label><input id="rsT" autocomplete="off"></div><div class="row"><button class="btn bad" id="rsGo">Reset everything</button></div></section>
  <section class="card stack"><h2 class="h3">About</h2><p>Independent exam preparation. Not affiliated with, endorsed by or sponsored by the International Code Council. All questions are original practice items, not ICC exam questions. Code references are pointers to the 2018 IBC and the Concrete Manual; the text of the books is not reproduced. The code-book reader only opens PDF files you add yourself, and keeps them on your device. Items marked "Demonstration" are pending verification and never appear in scored exams.</p><p class="muted">Content: ${G.LESSONS.length} lessons · ${VER.length} verified questions · ${G.Q.length-VER.length} demonstration · ${G.SCENARIOS.length} scenarios · ${G.LOOKUPS.length} lookup drills · ${G.CARDS.length} seed flashcards.</p></section>`;
  m.querySelectorAll('[data-th]').forEach(b=>b.onclick=()=>{S.theme=b.dataset.th;applyTheme();save();vData(m)});
+ $('#setFx').onchange=e=>{S.fx=e.target.checked;save();toast(S.fx?'Effects on':'Effects off')};$('#setMark').onchange=e=>{S.examMark=e.target.checked;save();toast(S.examMark?'Right/wrong shown during exams':'Answers hidden until you submit')};
+ $('#setTry').onclick=e=>{window.G11FX.off=false;window.G11FX.right(e.target)};
  $('#exMk').onclick=()=>{const t=$('#exT');t.value=JSON.stringify(Object.assign({},S,{run:null,exported:new Date().toISOString(),app:'g11prep'}));t.hidden=false;$('#exCp').hidden=false;t.select()};
  $('#exCp').onclick=()=>{const t=$('#exT');navigator.clipboard&&navigator.clipboard.writeText(t.value).then(()=>toast('Copied'),()=>{t.select();toast('Press Ctrl+C or Cmd+C to copy')})||(t.select(),toast('Press Ctrl+C or Cmd+C to copy'))};
  $('#imF').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$('#imT').value=r.result};r.readAsText(f)};
