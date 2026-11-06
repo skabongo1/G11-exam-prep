@@ -180,6 +180,50 @@ details summary{cursor:pointer;font-weight:600;min-height:32px}
 @media (max-width:900px){.top{position:static}.runbar{top:env(safe-area-inset-top,0px)}}@media (max-width:560px){.brand span{display:none}}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:12px;z-index:60;max-width:calc(100% - 32px);font-weight:600}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+/* ---- merged: book guides, rule sheets, series, reader ---- */
+.small{font-size:.86rem}.mono{font-family:ui-monospace,Consolas,monospace;font-size:.9em}.h4{font-size:1.05rem;margin:0}
+.row.wrap{flex-wrap:wrap}.sp{flex:1}.callout.ok{border-color:var(--ok);background:var(--oks)}
+.stat{border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:2px;background:var(--paper)}
+.stat .lab{font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}.stat b{font-size:1.7rem;font-variant-numeric:tabular-nums}
+.hlkey{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.hl{padding:2px 8px;border-radius:4px;font-weight:600;color:#1b1b1b}
+.hl.y{background:#ffe866}.hl.b{background:#9fd3ff}.hl.p{background:#ffb3d1}.hl.g{background:#a8ecc2}
+.book{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px}
+.btab{border-radius:0 8px 8px 0;padding:6px 10px;border-left:10px solid var(--muted);background:var(--paper);border-top:1px solid var(--line);border-right:1px solid var(--line);border-bottom:1px solid var(--line);font-size:.84rem;display:grid}
+.btab.k1{border-left-color:var(--d1)}.btab.k2{border-left-color:var(--d2)}.btab.k3{border-left-color:var(--d3)}.btab.k4{border-left-color:var(--d4)}
+.chg{display:grid;gap:8px}.chg details{border:1px solid var(--line);border-left:6px solid var(--muted);border-radius:10px;padding:8px 12px;background:var(--paper)}
+.chg details.k1{border-left-color:var(--d1)}.chg details.k2{border-left-color:var(--d2)}.chg details.k3{border-left-color:var(--d3)}.chg details.k4{border-left-color:var(--d4)}
+.chg summary{font-weight:700;display:flex;justify-content:space-between;gap:10px;cursor:pointer}.chg summary small{color:var(--muted);font-weight:400}
+.chg ul{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:6px}.chg li{display:grid;grid-template-columns:auto 1fr;gap:10px}
+.sw{width:14px;height:14px;border-radius:3px;margin-top:5px}.sw.y{background:#ffe866}.sw.b{background:#9fd3ff}.sw.p{background:#ffb3d1}.sw.g{background:#a8ecc2}
+.formula{background:var(--soft);border-radius:8px;padding:8px 10px;overflow-x:auto}
+.out{font-weight:700;background:var(--d3s);border-radius:8px;padding:8px 12px;font-variant-numeric:tabular-nums}
+.field.sm{min-width:110px;flex:1 1 110px}
+tr.hi td{background:var(--oks)}
+ol.rules{margin:0;padding-left:22px;display:grid;gap:8px}ol.rules .ref{color:var(--muted);font-size:.85rem}
+.linkish{background:none;border:0;padding:4px 0;color:var(--ink);text-align:left;cursor:pointer;font:inherit;flex:1;min-width:0}
+.linkish:hover{text-decoration:underline}.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+.series{border-top:5px solid var(--d3)}
+/* reader */
+.rd-tools{display:grid;gap:8px}
+@media (min-width:901px){.rd-tools{position:sticky;top:0;z-index:6}}
+.rd-pg input{width:5.5em}.rd-tools input#rdQ{flex:1 1 220px;min-width:0}
+.seg.sm button{min-height:36px;padding:4px 10px;font-size:.9rem}
+.rd-sw{display:inline-flex;gap:6px}.swb{width:30px;height:30px;border-radius:50%;border:2px solid var(--line);cursor:pointer}
+.swb.y{background:#ffe866}.swb.b{background:#9fd3ff}.swb.p{background:#ffb3d1}.swb.g{background:#a8ecc2}.swb[aria-pressed="true"]{outline:3px solid var(--ink);outline-offset:1px}
+.rd-strip{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.rd-tabchip{flex:none;border:1px solid var(--line);border-left:6px solid var(--c);background:var(--paper);color:var(--ink);border-radius:0 8px 8px 0;padding:4px 10px;font-size:.82rem;cursor:pointer;white-space:nowrap}
+.rd-tabchip.on{background:var(--soft);font-weight:700}
+.rd-wrap{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
+@media (max-width:900px){.rd-wrap{grid-template-columns:minmax(0,1fr)}}
+.rd-stage{overflow:auto;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:2px;max-height:78vh;touch-action:pan-y pinch-zoom}
+.rd-pagebox{position:relative;margin:0 auto;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.2)}
+.rd-pagebox canvas{display:block}
+.rd-ov{position:absolute;inset:0}.rd-ov[data-mode="hl"]{cursor:crosshair;touch-action:none}.rd-ov[data-mode="erase"] .rd-hl{cursor:pointer;outline:1px dashed #c00}
+.rd-ov[data-mode="read"]{pointer-events:none}
+.rd-hl{position:absolute;mix-blend-mode:multiply;border-radius:2px}.rd-hl.draft{opacity:.8}
+.rd-hit{position:absolute;border:2px solid #e0007a;border-radius:3px;pointer-events:none}
+.rd-side{display:grid;gap:10px;max-height:78vh;overflow:auto}
+.rd-list{display:grid;gap:4px;margin:6px 0 0;padding:0}.rd-list li{display:flex;gap:6px;align-items:flex-start;border-bottom:1px solid var(--line);padding-bottom:4px}
 </style>
 <a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="in"><div class="brand"><b>G11 Exam Prep</b><span>Independent study app · not affiliated with ICC</span></div><button class="btn sm" id="thBtn" aria-label="Change color theme">◐ Theme</button></div><div class="stripe" aria-hidden="true"></div></header>

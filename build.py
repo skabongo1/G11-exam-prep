@@ -14,7 +14,7 @@ cut = shell.index('</style>') + len('</style>')
 head_part, body_part = shell[:cut], shell[cut:]
 
 scripts = ''
-for f in ['content.js', 'content2.js', 'content3.js', 'series.js', 'scenarios.js', 'app.js']:
+for f in ['content.js', 'content2.js', 'content3.js', 'content4.js', 'content5.js', 'series.js', 'scenarios.js', 'guides.js', 'reader.js', 'app.js']:
     scripts += '\n<script>\n' + open(os.path.join(SRC, f), encoding='utf-8').read() + '\n</script>'
 
 pwa_head = f'''<!doctype html>
@@ -80,7 +80,7 @@ open(os.path.join(OUT, 'manifest.webmanifest'), 'w').write(json.dumps(manifest, 
 sw = f'''/* G11 Exam Prep service worker. Version changes on every build so phones update. */
 const VERSION = {json.dumps(VERSION)};
 const CACHE = 'g11prep-' + VERSION;
-const CORE = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/apple-touch-icon.png', './icons/favicon-32.png'];
+const CORE = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/apple-touch-icon.png', './icons/favicon-32.png', './lib/pdfjs/pdf.min.mjs', './lib/pdfjs/pdf.worker.min.mjs'];
 self.addEventListener('install', e => {{ e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE))); }});
 self.addEventListener('activate', e => {{
   e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith('g11prep-') && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));

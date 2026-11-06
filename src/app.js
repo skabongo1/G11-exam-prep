@@ -20,7 +20,7 @@ const dayFromISO=s=>{if(!s)return null;const t=Date.parse(s+'T00:00:00Z');return
 /* ---------------- state ---------------- */
 const KEY='g11prep.v1';
 const blank=()=>({v:1,created:Date.now(),theme:'system',profile:{onboarded:false,examDate:'',jur:'',ibc:'2018',cm:'',level:'',hours:10,days:[1,2,3,4,5]},
- diag:null,plan:null,lessons:{},att:{},book:[],missed:[],notes:{},lookups:[],scen:{},runs:[],run:null,lastUsed:{},cards:{},custom:[],log:[],pend:null});
+ diag:null,plan:null,lessons:{},att:{},book:[],missed:[],notes:{},lookups:[],scen:{},runs:[],run:null,lastUsed:{},cards:{},custom:[],log:[],pend:null,books:{},series:[]});
 let S;
 function load(){try{const r=localStorage.getItem(KEY);S=r?Object.assign(blank(),JSON.parse(r)):blank()}catch(e){S=blank()}}
 let saveT=null;
@@ -64,9 +64,9 @@ const MOD_SCN={A:['S3','S4'],B:['S1','S2','S5']};
 function genPlan(){const P=S.profile,t=today();let end=dayFromISO(P.examDate);if(!end||end<=t+3)end=t+56;
  const days=(P.days&&P.days.length?P.days:[1,2,3,4,5]);const mpd=Math.max(30,Math.round((+P.hours||10)*60/days.length));
  const weak={};[1,2,3,4].forEach(d=>{const v=S.diag&&S.diag.dom[d];weak[d]=v&&v[1]?1-v[0]/v[1]:0.5});
- const modOrder=weak[2]>weak[1]?['B','A']:['A','B'];
+ const modOrder=(weak[2]>weak[1]?['B','A']:['A','B']).concat(G.MODULES.map(x=>x.id).filter(x=>x!=='A'&&x!=='B'));
  const queue=[];modOrder.forEach(m=>{G.LESSONS.filter(l=>l.mod===m).forEach(l=>{if(!(S.lessons[l.id]&&S.lessons[l.id].done))queue.push({type:'lesson',ref:l.id,label:'Lesson '+l.id+': '+l.title,mins:l.mins})});
-  MOD_SCN[m].forEach(s=>queue.push({type:'scn',ref:s,label:'Scenario: '+SBY[s].title,mins:20}))});
+  (MOD_SCN[m]||[]).forEach(s=>queue.push({type:'scn',ref:s,label:'Scenario: '+SBY[s].title,mins:20}))});
  const pr=[1,2,3,4].map(d=>({d,w:DOM[d].w*(0.5+weak[d])}));let prI=0;const prSeq=[];pr.forEach(x=>{for(let i=0;i<Math.round(x.w/8);i++)prSeq.push(x.d)});
  const out=[];let wk=0;
  for(let d=t;d<end;d++){const wd=new Date(d*86400000).getUTCDay();if(!days.includes(wd))continue;let left=mpd;const tasks=[];
@@ -86,10 +86,12 @@ function taskHref(k){return k.type==='lesson'?'#lesson-'+k.ref:k.type==='scn'?'#
 function goTask(k){S.pend={type:k.type,ref:k.ref||null};save();location.hash=taskHref(k).slice(1);route()}
 
 /* ---------------- question card ---------------- */
-function qMeta(q){return `<div class="qmeta"><span class="pill" style="--c:${DCOL[q.d]}">${esc(DOM[q.d]?DOM[q.d].name:'')}</span><span class="pill plain">${esc(q.s)}</span><span class="pill plain">${['','Basic','Intermediate','Advanced'][q.df]}</span><span class="pill plain">2018 IBC</span>${q.v?'<span class="pill ok">Verified</span>':'<span class="pill warn">Demonstration · pending verification</span>'}</div>`}
+function qMeta(q){return `<div class="qmeta"><span class="pill" style="--c:${DCOL[q.d]}">${esc(DOM[q.d]?DOM[q.d].name:'')}</span><span class="pill plain">${esc(q.s)}</span><span class="pill plain">${['','Basic','Intermediate','Advanced'][q.df]}</span><span class="pill plain">${q.b==='CM'?'Concrete Manual':q.b==='MATH'?'Calculation':'2018 IBC'}</span>${q.v?'<span class="pill ok">Verified</span>':'<span class="pill warn">Demonstration · pending verification</span>'}</div>`}
 function feedback(q,sel){const ok=sel===q.a;return `<div class="fb ${ok?'good':'bad'}" role="status"><b>${ok?'Correct.':sel==null||sel<0?'Not answered. Answer: '+L4[q.a]+'.':'Not quite. Answer: '+L4[q.a]+'.'}</b><p>${esc(q.ex)}</p>
  <details ${ok?'':'open'}><summary>Why each option is right or wrong</summary><ul>${q.o.map((o,j)=>`<li><b>${L4[j]}.</b> ${j===q.a?'Correct. ':''}${esc(q.w[j]||q.ex)}</li>`).join('')}</ul></details>
- <p class="ref"><b>Reference:</b> ${esc(q.r)}${q.p?' · page '+q.p:''} · <b>How to find it:</b> ${esc(q.f)}</p></div>`}
+ <p class="ref"><b>Reference:</b> ${esc(q.r)}${q.p?' · page '+q.p:''} · <b>How to find it:</b> ${esc(q.f)}</p>${q.b==='IBC'||q.b==='CM'?`<div class="row"><button class="mini" data-openq="${q.id}">📖 Open in my ${q.b==='CM'?'Concrete Manual':'IBC'}</button></div>`:''}</div>`}
+function findKey(q){const r=q.r.replace(/^Concrete Manual\s*/,'');let m=r.match(/Table\s+[\d.]+/);if(m)return m[0];m=r.match(/^(\d+\.\d+)/);if(m)return m[1];m=r.match(/Ch\.\s*(\d+)/);if(m&&q.ch)return '';return q.f.split('→')[1]?q.f.split('→')[1].split(',').pop().trim():''}
+function openQ(q){if(q.b==='CM'){const k=findKey(q);const t=(q.f.match(/Chapter \d+, ([^→]+)/)||[])[1];G.READER.open('cm',{find:k||(t?t.trim():'')})}else G.READER.open('ibc',{printed:q.p?+q.p:null,find:q.p?'':(q.r.match(/[\d.]+/)||[''])[0]})}
 function qCard(q,i,sel,o){o=o||{};const show=o.fb&&sel!=null;const bk=S.book.includes(q.id);
  return `<article class="q" data-q="${q.id}"><header class="qh"><span class="qn">Q${i+1}${o.total?' of '+o.total:''}</span>${qMeta(q)}</header><p class="qt">${esc(q.q)}</p>
  <div class="opts" role="group" aria-label="Answer options">${q.o.map((t,j)=>{let c='';if(show){if(j===q.a)c='right';else if(j===sel)c='wrong'}else if(sel===j)c='sel';
@@ -97,16 +99,17 @@ function qCard(q,i,sel,o){o=o||{};const show=o.fb&&sel!=null;const bk=S.book.inc
  ${show?feedback(q,sel):''}
  <div class="qtools"><button class="mini" data-bk="${q.id}" aria-pressed="${bk}">${bk?'★ Bookmarked':'☆ Bookmark'}</button>${o.notes!==false?`<button class="mini" data-note="q:${q.id}">${S.notes['q:'+q.id]?'✎ Edit note':'✎ Add note'}</button>`:''}</div>
  <div class="notebox" data-nb="q:${q.id}" hidden></div></article>`}
-document.addEventListener('click',e=>{const b=e.target.closest('[data-bk]');if(b){const id=b.dataset.bk;S.book=S.book.includes(id)?S.book.filter(x=>x!==id):[...S.book,id];save();b.setAttribute('aria-pressed',S.book.includes(id));b.textContent=S.book.includes(id)?'★ Bookmarked':'☆ Bookmark';say(S.book.includes(id)?'Bookmarked':'Bookmark removed');return}
+document.addEventListener('click',e=>{const oq=e.target.closest('[data-openq]');if(oq){const q=QBY[oq.dataset.openq];if(q)openQ(q);return}
+ const b=e.target.closest('[data-bk]');if(b){const id=b.dataset.bk;S.book=S.book.includes(id)?S.book.filter(x=>x!==id):[...S.book,id];save();b.setAttribute('aria-pressed',S.book.includes(id));b.textContent=S.book.includes(id)?'★ Bookmarked':'☆ Bookmark';say(S.book.includes(id)?'Bookmarked':'Bookmark removed');return}
  const n=e.target.closest('[data-note]');if(n){const k=n.dataset.note;const box=document.querySelector(`[data-nb="${CSS.escape(k)}"]`);if(!box)return;box.hidden=!box.hidden;if(!box.hidden){box.innerHTML=`<label class="lbl" for="nt_${k.replace(/\W/g,'_')}">Your note</label><textarea id="nt_${k.replace(/\W/g,'_')}" rows="3">${esc(S.notes[k]||'')}</textarea><div class="row"><button class="btn sm" data-ns="${k}">Save note</button></div>`;box.querySelector('textarea').focus()}return}
  const ns=e.target.closest('[data-ns]');if(ns){const k=ns.dataset.ns;const v=ns.closest('.notebox').querySelector('textarea').value.trim();if(v)S.notes[k]=v;else delete S.notes[k];save();toast('Note saved');ns.closest('.notebox').hidden=true}});
 
 /* ---------------- routing ---------------- */
-const NAV=[['home','Dashboard'],['plan','Study plan'],['learn','Course'],['practice','Practice'],['scenarios','Scenarios'],['lookup','Lookup trainer'],['exam','Practice exam'],['cards','Flashcards'],['info','Exam info'],['data','Data & settings']];
+const NAV=[['home','Dashboard'],['plan','Study plan'],['learn','Course'],['practice','Practice'],['scenarios','Scenarios'],['lookup','Lookup trainer'],['reader','My code books'],['guides','Book guides'],['exam','Practice exams'],['cards','Flashcards'],['info','Exam info'],['data','Data & settings']];
 let timer=null;
 function route(){clearInterval(timer);timer=null;const h=(location.hash||'#home').slice(1)||'home';const main=$('#main');
- const base=h.split('-')[0];$$('#nav a').forEach(a=>a.setAttribute('aria-current',a.dataset.r===base||(base==='lesson'&&a.dataset.r==='learn')||(base==='scn'&&a.dataset.r==='scenarios')||(base==='diagnostic'&&a.dataset.r==='home')||(base==='start'&&a.dataset.r==='home')||(base==='local'&&a.dataset.r==='info')?'page':'false'));
- const V={home:vHome,start:vStart,diagnostic:vDiag,plan:vPlan,learn:vLearn,practice:vPractice,scenarios:vScenarios,lookup:vLookup,exam:vExam,cards:vCards,info:vInfo,local:vLocal,data:vData};
+ const base=h.split('-')[0];$$('#nav a').forEach(a=>a.setAttribute('aria-current',a.dataset.r===base||(base==='lesson'&&a.dataset.r==='learn')||(base==='scn'&&a.dataset.r==='scenarios')||(base==='diagnostic'&&a.dataset.r==='home')||(base==='start'&&a.dataset.r==='home')||(base==='local'&&a.dataset.r==='info')||(base==='rules'&&a.dataset.r==='learn')?'page':'false'));
+ const V={home:vHome,start:vStart,diagnostic:vDiag,plan:vPlan,learn:vLearn,practice:vPractice,scenarios:vScenarios,lookup:vLookup,exam:vExam,cards:vCards,info:vInfo,local:vLocal,data:vData,reader:m=>G.READER.view(m,API),guides:m=>G.GUIDES.view(m,API),rules:vRules};
  if(h.startsWith('lesson-')&&LBY[h.slice(7)])vLesson(main,h.slice(7));else if(h.startsWith('scn-')&&SBY[h.slice(4)])vScn(main,h.slice(4));else (V[h]||vHome)(main);
  main.focus({preventScroll:true});window.scrollTo(0,0)}
 window.addEventListener('hashchange',route);
@@ -179,7 +182,7 @@ function drawWeighted(n,pool){const per={};let tot=0;[1,2,3,4].forEach(d=>{per[d
  return shuffle(out)}
 function startRun(kind,qids,secs,label){S.run={kind,label,qids,ans:{},flags:[],start:Date.now(),dur:secs||null,cur:0,tpq:{},enter:Date.now()};save()}
 function runView(m,backHref){const R=S.run;if(!R)return;R.enter=Date.now();const q=QBY[R.qids[R.cur]];const fl=R.flags.includes(R.cur);const un=R.qids.length-Object.keys(R.ans).length;
- m.innerHTML=`<div class="runbar" role="region" aria-label="${esc(R.label)} controls"><span><b>${esc(R.label)}</b> · ${R.cur+1}/${R.qids.length} · ${R.qids.length-un} answered</span>${R.dur?`<span class="clock" id="clk" aria-live="off"></span>`:''}<span class="row"><button class="btn sm inv" id="rFlag" aria-pressed="${fl}">${fl?'Unflag':'Flag'} (F)</button><button class="btn sm inv" id="rEnd">Submit</button></span></div>
+ m.innerHTML=`<div class="runbar" role="region" aria-label="${esc(R.label)} controls"><span><b>${esc(R.label)}</b> · ${R.cur+1}/${R.qids.length} · ${R.qids.length-un} answered</span>${R.dur?`<span class="clock" id="clk" aria-live="off"></span>`:''}<span class="row"><a class="btn sm inv" href="#reader" title="Look it up in your books; the clock keeps running">📖 Books</a><button class="btn sm inv" id="rFlag" aria-pressed="${fl}">${fl?'Unflag':'Flag'} (F)</button><button class="btn sm inv" id="rEnd">Submit</button></span></div>
  <div id="rConf"></div>${qCard(q,R.cur,R.ans[R.cur],{fb:false,total:R.qids.length,notes:false})}
  <div class="row between"><button class="btn" id="rPrev" ${R.cur===0?'disabled':''}>← Previous (P)</button><button class="btn" id="rNF">Next flagged</button><button class="btn primary" id="rNext" ${R.cur===R.qids.length-1?'disabled':''}>Next (N) →</button></div>
  <div class="card stack"><h2 class="h3">Question navigator</h2><div class="qgrid">${R.qids.map((id,i)=>`<button class="qg ${R.ans[i]!=null?'ans':''} ${R.flags.includes(i)?'flag':''} ${i===R.cur?'cur':''}" data-g="${i}" aria-label="Question ${i+1}${R.ans[i]!=null?', answered':', unanswered'}${R.flags.includes(i)?', flagged':''}">${i+1}</button>`).join('')}</div><p class="fine">Blue: answered · red dot: flagged · outline: current. Keys 1–4 or A–D choose an answer. Answers stay hidden until you submit.</p></div>`;
@@ -246,10 +249,18 @@ function vPlan(m){const P=S.profile;const D=['Sun','Mon','Tue','Wed','Thu','Fri'
  $('#apGo').onclick=()=>{const days=[...m.querySelectorAll('.days input:checked')].map(x=>+x.value);if(!days.length){toast('Pick at least one study day');return}Object.assign(P,{examDate:$('#apDate').value,hours:Math.max(2,+$('#apHrs').value||10),days});genPlan();toast('Plan regenerated');vPlan(m)}}
 
 /* ---------- Course ---------- */
-function vLearn(m){m.innerHTML=`${head('Course','Modules follow the official outline. Two of the planned modules are fully built.')}
+function vLearn(m){m.innerHTML=`${head('Course','Lessons follow the official outline. Rule sheets cover every subtopic from the verified question bank.')}
+ <section class="card stack"><div class="vh"><div><div class="eyebrow">All 16 subtopics · both books</div><h2>Rule sheets</h2><p class="muted">Every verified rule in the bank (${VER.length}), grouped by exam subtopic with its section, table or page and a link into your book. Use them to review a module before a practice exam.</p></div><a class="btn primary" href="#rules">Open rule sheets</a></div></section>
  ${G.MODULES.map(md=>`<section class="card stack mod" style="--c:${DCOL[md.d]}"><div class="vh"><div><div class="eyebrow">Module ${md.id} · ${DOM[md.d].name} (${DOM[md.d].w}% of exam)</div><h2>${esc(md.title)}</h2><p class="muted">${esc(md.blurb)}</p></div></div>
  <ol class="lessons">${G.LESSONS.filter(l=>l.mod===md.id).map(l=>{const st=S.lessons[l.id]||{};return `<li><a href="#lesson-${l.id}"><span class="lid">${l.id}</span><span>${esc(l.title)}</span><span class="muted">${l.mins} min</span><span class="st">${st.done?'✓ Done':st.seen?'In progress':''}</span></a></li>`}).join('')}</ol></section>`).join('')}
- <section class="card stack"><h2>Coming next</h2><p class="muted">Planned modules for the rest of the outline: Use & occupancy and construction types; Fire protection systems; Interior environment and accessibility; Footings and foundations; Concrete (needs your Concrete Manual); Floors; Wall framing and stairs; Roof construction; Masonry; Interior finishes; Glass and glazing; Exterior finishes and roof coverings. Practice questions already cover several of these.</p></section>`}
+ <section class="card stack"><h2>Coming next</h2><p class="muted">Full lessons still to build: Use & occupancy and construction types; Fire protection systems; Interior environment and accessibility; Footings and foundations; Floors; Wall framing and stairs; Roof construction; Masonry; Interior finishes; Glass and glazing; Exterior finishes and roof coverings. Until then, use the rule sheets and practice questions, which already cover all of them.</p></section>`}
+function vRules(m){const subs=[];G.EXAM.domains.forEach(d=>d.subs.forEach(s=>subs.push([d.d,s])));let cur=m._rs||subs[0][1];
+ const num=r=>{const x=(r.match(/[\d]+(?:\.[\d]+)*/)||['9999'])[0].split('.').map(Number);return x[0]*1e6+(x[1]||0)*1e3+(x[2]||0)};
+ const list=VER.filter(q=>q.s===cur).sort((a,b)=>(a.b>b.b?1:a.b<b.b?-1:0)||num(a.r)-num(b.r));
+ m.innerHTML=`<nav class="crumbs"><a href="#learn">Course</a> › Rule sheets</nav>${head('Rule sheets','One line per verified rule. Tap 📖 to open the page in your own copy of the book.')}
+ <div class="field"><label for="rsSel">Subtopic</label><select id="rsSel">${G.EXAM.domains.map(d=>`<optgroup label="${esc(d.name)} · ${d.w}%">${d.subs.map(s=>`<option ${s===cur?'selected':''}>${esc(s)}</option>`).join('')}</optgroup>`).join('')}</select></div>
+ <section class="card stack"><h2 class="h3">${esc(cur)} · ${list.length} rules</h2><ol class="rules">${list.map(q=>`<li><span>${esc(q.ex)}</span> <span class="ref">${esc(q.r)}${q.p?' · p. '+q.p:''}</span>${q.b!=='MATH'?` <button class="mini" data-openq="${q.id}" aria-label="Open in my book">📖</button>`:''}</li>`).join('')}</ol></section>`;
+ $('#rsSel').onchange=e=>{m._rs=e.target.value;vRules(m)}}
 function vLesson(m,id){const l=LBY[id];const md=G.MODULES.find(x=>x.id===l.mod);S.lessons[id]=Object.assign({seen:true},S.lessons[id]||{});save();
  const ls=G.LESSONS.filter(x=>x.mod===l.mod);const i=ls.indexOf(l);const qs=l.quiz.map(x=>QBY[x]);const ans=(S.lessons[id].ans)||{};
  m.innerHTML=`<nav class="crumbs" aria-label="Breadcrumb"><a href="#learn">Course</a> › Module ${md.id} › ${l.id}</nav>
@@ -259,7 +270,7 @@ function vLesson(m,id){const l=LBY[id];const md=G.MODULES.find(x=>x.id===l.mod);
  <section class="card stack prose"><h2 class="h3">Plain-language explanation</h2>${l.explain}</section>
  <section class="grid2"><div class="card stack"><h2 class="h3">Terms</h2><dl class="terms">${l.terms.map(t=>`<dt>${esc(t[0])}</dt><dd>${esc(t[1])}</dd>`).join('')}</dl></div><div class="card stack visual"><h2 class="h3">Diagram or worked example</h2>${l.visual}</div></section>
  <section class="card stack prose"><h2 class="h3">On the job</h2>${l.apply}</section>
- <section class="card stack"><h2 class="h3">Find it in your book</h2><p><b>Task:</b> ${esc(l.lookup.task)}</p><ol class="tight">${l.lookup.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol><details><summary>Show answer</summary><p><b>${esc(l.lookup.answer)}</b> (2018 IBC, first printing)</p></details></section>
+ <section class="card stack"><h2 class="h3">Find it in your book</h2><p><b>Task:</b> ${esc(l.lookup.task)}</p><ol class="tight">${l.lookup.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol><details><summary>Show answer</summary><p><b>${esc(l.lookup.answer)}</b> (${l.book==='CM'?'Concrete Manual, 2021 IBC / ACI 318-19 edition':'2018 IBC, first printing'})</p></details></section>
  <section class="card stack"><h2 class="h3">Common mistakes and exam traps</h2><ul class="tight">${l.traps.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></section>
  <section class="stack"><h2>Lesson quiz</h2><p class="muted">Immediate feedback. Your first answer on each question counts toward your stats.</p><div class="quiz" id="lq">${qs.map((q,k)=>qCard(q,k,ans[q.id],{fb:true})).join('')}</div></section>
  <div class="row between">${i>0?`<a class="btn" href="#lesson-${ls[i-1].id}">← ${ls[i-1].id}</a>`:'<span></span>'}<button class="btn primary" id="lDone">${S.lessons[id].done?'Lesson complete ✓':'Mark lesson complete'}</button>${i<ls.length-1?`<a class="btn" href="#lesson-${ls[i+1].id}">${ls[i+1].id} →</a>`:'<a class="btn" href="#learn">Back to course</a>'}</div>`;
@@ -353,6 +364,16 @@ function vLookup(m){const st=stats();const pend=S.pend;S.pend=null;save();let cu
 
 /* ---------- Exam ---------- */
 function quotas(n){const per={};let tot=0;[1,2,3,4].forEach(d=>{per[d]=Math.max(d===4?1:0,Math.round(n*DOM[d].w/100));tot+=per[d]});per[3]+=n-tot;return per}
+function seenQ(id){return !!S.att[id]||(S.series||[]).some(x=>x.qids.includes(id))}
+function buildSeries(){const n=90,per=quotas(n),out=[];const rec=q=>S.lastUsed[q.id]||0;
+ [1,2,3,4].forEach(d=>{const subs=DOM[d].subs;const Q=per[d];const pools=subs.map(s=>shuffle(VER.filter(q=>q.d===d&&q.s===s)).sort((a,b)=>(seenQ(a.id)-seenQ(b.id))||(rec(a)-rec(b))));
+  // one per subtopic first, then share the rest by how many unseen questions each subtopic still has (cap 40% of the domain)
+  const cap=Math.max(2,Math.ceil(Q*0.4));const take=subs.map((s,i)=>pools[i].length?1:0);let left=Q-take.reduce((a,b)=>a+b,0);
+  const wt=pools.map(pl=>Math.max(1,pl.filter(q=>!seenQ(q.id)).length));
+  while(left>0){let best=-1,bv=-1;pools.forEach((pl,i)=>{if(take[i]>=pl.length||take[i]>=cap)return;const v=wt[i]/(take[i]+1)+Math.random()*0.01;if(v>bv){bv=v;best=i}});if(best<0)break;take[best]++;left--}
+  while(left>0){let best=-1,bv=-1;pools.forEach((pl,i)=>{if(take[i]>=pl.length)return;const v=wt[i]/(take[i]+1);if(v>bv){bv=v;best=i}});if(best<0)break;take[best]++;left--}
+  pools.forEach((pl,i)=>pl.slice(0,take[i]).forEach(q=>out.push(q.id)))});
+ const no=3+(S.series||[]).length+1;S.series=S.series||[];S.series.push({no,at:Date.now(),qids:shuffle(out)});save();return S.series[S.series.length-1]}
 function canDraw(n){const per=quotas(n);return [1,2,3,4].every(d=>VER.filter(q=>q.d===d).length>=per[d])}
 function vExam(m){if(S.run&&S.run.kind==='exam'){if(S.run.done)return resultView(m,'exam','all');return runView(m,'exam')}
  const SER=G.SERIES||[];const hist=S.runs.filter(r=>r.kind==='exam');const best=id=>{const h=hist.filter(r=>r.ser===id);return h.length?Math.max(...h.map(r=>r.p)):null};
@@ -360,11 +381,18 @@ function vExam(m){if(S.run&&S.run.kind==='exam'){if(S.run.done)return resultView
  m.innerHTML=`${head('Practice exams','Verified questions only, weighted by the official outline (19 / 31 / 42 / 8). Timed at the real pace: 4 hours for 90 questions. Answers stay hidden until you submit.')}
  <section class="card stack"><h2>Mock exam series</h2><p class="muted">${SER.length} fixed full-length exams. No question appears in more than one mock, and each mock covers every subtopic in the official outline. Retake a mock to measure progress on the same set.</p>
  <div class="grid3">${SER.map(x=>{const b=best(x.id);const n=hist.filter(r=>r.ser===x.id).length;return `<div class="mock-card"><div class="eyebrow">${x.qids.length} questions · ${fmtT(x.qids.length*SEC_PER_Q)}</div><h3>${esc(x.title)}</h3><p class="muted">${n?`Taken ${n}× · best ${b}%`:'Not taken yet'}</p><button class="btn primary" data-ser="${x.id}">Start ${esc(x.title)}</button></div>`}).join('')}</div></section>
- <section class="card stack"><h2>Generated exam</h2><p class="muted">A fresh draw each time from all ${VER.length} verified questions at the official weights. Questions you saw most recently are drawn last.</p>
+ <section class="card stack series"><div class="vh"><div><div class="eyebrow">Unlimited · full length</div><h2>Exam series</h2><p class="muted">Each new series is a fresh 90-question exam at the official weights (≈ 17 permits · 28 life safety · 38 structural · 7 envelope), spread across every subtopic, with the real 4-hour (240-minute) clock. Questions you have never seen come first, so each series pushes you through more of the bank. Answers stay hidden until you submit.</p></div></div>
+  ${(()=>{const un=VER.filter(q=>!seenQ(q.id)).length;return `<div class="grid3"><div class="stat"><span class="lab">Question bank</span><b>${VER.length}</b><span class="muted">${VER.filter(q=>q.b==='IBC').length} IBC · ${VER.filter(q=>q.b==='CM').length} Concrete Manual · ${VER.filter(q=>q.b==='MATH').length} calculation</span></div><div class="stat"><span class="lab">Not seen yet</span><b>${un}</b><span class="muted">${Math.round((1-un/VER.length)*100)}% of the bank seen</span></div><div class="stat"><span class="lab">Series made</span><b>${(S.series||[]).length}</b><span class="muted">plus Mock Exams 1–3</span></div></div>`})()}
+  <div class="row"><button class="btn primary big" id="serNew">Start new series #${3+(S.series||[]).length+1} · 90 questions · 4:00:00</button></div>
+  ${(S.series||[]).length?`<details><summary>Retake an earlier series</summary><ul class="plain">${S.series.slice().reverse().map(x=>{const h=hist.filter(r=>r.ser==='X'+x.no);return `<li class="row between"><span>Series #${x.no} · ${new Date(x.at).toLocaleDateString()} · ${h.length?'best '+Math.max(...h.map(r=>r.p))+'%':'not finished'}</span><button class="btn sm" data-xser="${x.no}">Take again</button></li>`}).join('')}</ul></details>`:''}
+ </section>
+ <section class="card stack"><h2>Shorter generated exam</h2><p class="muted">A fresh draw each time from all ${VER.length} verified questions at the official weights. Questions you saw most recently are drawn last.</p>
   ${gen.map(o=>{const ok=canDraw(o[0]);return `<label class="chk big ${ok?'':'dis'}"><input type="radio" name="exn" value="${o[0]}" ${o[0]===90?'checked':''} ${ok?'':'disabled'}> ${o[1]}: ${o[0]} questions · ${fmtT(o[0]*SEC_PER_Q)}</label>`}).join('')}
   <div class="row"><button class="btn primary big" id="exGo">Start generated exam</button></div></section>
  <section class="card stack"><h2>Exam history</h2>${hist.length?`<div class="tbl"><table><thead><tr><th>Date</th><th>Exam</th><th>Questions</th><th>Score</th><th>Time</th></tr></thead><tbody>${hist.map(r=>`<tr><td>${new Date(r.at).toLocaleDateString()}</td><td>${esc(r.label)}</td><td class="num">${r.n}</td><td class="num">${r.p}%</td><td class="num">${fmtT(r.secs)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No exams yet.</p>'}</section>`;
  m.querySelectorAll('[data-ser]').forEach(b=>b.onclick=()=>{const x=SER.find(y=>y.id===b.dataset.ser);startRun('exam',x.qids.slice(),x.qids.length*SEC_PER_Q,x.title);S.run.ser=x.id;save();runView(m,'exam')});
+ $('#serNew').onclick=()=>{const x=buildSeries();startRun('exam',x.qids.slice(),x.qids.length*SEC_PER_Q,'Exam series #'+x.no);S.run.ser='X'+x.no;save();runView(m,'exam')};
+ m.querySelectorAll('[data-xser]').forEach(b=>b.onclick=()=>{const x=S.series.find(y=>y.no===+b.dataset.xser);startRun('exam',shuffle(x.qids),x.qids.length*SEC_PER_Q,'Exam series #'+x.no);S.run.ser='X'+x.no;save();runView(m,'exam')});
  $('#exGo').onclick=()=>{const n=+m.querySelector('input[name=exn]:checked').value;startRun('exam',drawWeighted(n,VER),n*SEC_PER_Q,`Generated exam (${n} Q)`);runView(m,'exam')}}
 
 /* ---------- Flashcards ---------- */
@@ -388,6 +416,11 @@ function vCards(m){const decks=[['all','All decks'],['t','Terminology'],['c','Co
 /* ---------- Info ---------- */
 function vInfo(m){const E=G.EXAM;m.innerHTML=`${head('Exam information',`Checked ${E.checked} against official ICC sources. Exam requirements only; local licensing is on a separate page.`)}
  <div class="tbl card"><table><thead><tr><th>Item</th><th>Detail</th><th>Status</th><th>Source</th></tr></thead><tbody>${E.rows.map(r=>`<tr><td><b>${esc(r[0])}</b></td><td>${esc(r[1])}</td><td>${r[2]==='v'?'<span class="pill ok">Verified</span>':'<span class="pill warn">Pending verification</span>'}</td><td class="muted">${esc(r[3])}</td></tr>`).join('')}</tbody></table></div>
+ <section class="card stack prose"><h2>How this exam works</h2>
+ <p>Questions come only from the two references named in the ICC bulletin: the <b>2018 International Building Code</b> and the <b>Concrete Manual</b> (the edition tied to the 2021 IBC and ACI 318-19, or the 2015 IBC / ACI 318-14 edition).</p>
+ <p>It is <b>open book</b>: you bring your approved printed books into the testing center. The exam is built to test whether you can read a complex construction scenario, pick out its keywords and quickly reach the right section or table through the table of contents or index, not whether you have memorized values.</p>
+ <p><b>90 multiple-choice questions in 4 hours (240 minutes)</b>, about 2.7 minutes per question. Weights: Structural Systems 42% (foundations, concrete, masonry, steel and wood) · Building Planning & Life Safety 31% (occupancy, fire-resistance ratings, means of egress, accessibility) · Permits & General Regulations 19% (administration, inspections, stop work orders) · Building Envelope 8% (roof assemblies, weather protection, exterior walls, glazing).</p>
+ <div class="row wrap"><a class="btn primary" href="#exam">Take an exam series</a><a class="btn" href="#reader">Open my code books</a><a class="btn" href="#guides">Open-book method</a></div></section>
  <section class="card stack"><h2>Official content outline</h2><div class="wbar" role="img" aria-label="Exam weights 19, 31, 42, 8 percent">${E.domains.map(d=>`<div style="flex:${d.w};background:${DCOL[d.d]}"><b>${d.w}%</b></div>`).join('')}</div>
  <div class="grid4">${E.domains.map(d=>`<div class="dom" style="--c:${DCOL[d.d]}"><h3>${esc(d.name)} · ${d.w}%</h3><p class="muted">≈ ${Math.round(90*d.w/100)} of 90 questions</p><ul class="tight">${d.subs.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div>`).join('')}</div></section>
  <section class="card stack"><h2>Question bank coverage</h2><p class="muted">${VER.length} verified questions mapped to every subtopic of the official outline, citing ${chapCount()} chapters of the 2018 IBC.</p>
@@ -396,8 +429,8 @@ function vInfo(m){const E=G.EXAM;m.innerHTML=`${head('Exam information',`Checked
  <section class="card stack"><h2>Do not assume the newest code</h2><p>G11 uses the <b>2018 IBC</b> even though newer editions exist. F11 is the same exam class on the 2015 IBC. Page references in this course are from the 2018 IBC first printing (August 2017).</p><a class="btn" href="#local">Colorado licensing (separate from the exam)</a></section>
  <section class="card stack"><h2>Sources</h2><ul class="plain">${E.sources.map(s=>`<li>${s[1]?`<a href="${s[1]}" target="_blank" rel="noopener">${esc(s[0])}</a>`:esc(s[0])} <span class="muted">· checked ${esc(s[2])}</span></li>`).join('')}</ul></section>`}
 function chapOf(r){if(!r)return null;let m=r.match(/(?:§|Table )\s*(\d+)/);if(!m)return null;const n=m[1];if(r.startsWith('§202')||n==='202')return 2;return +(n.length<=3?n[0]:n.slice(0,n.length-2))}
-function chapCount(){return new Set(VER.map(q=>chapOf(q.r)).filter(Boolean)).size}
-function chapList(){const c={};VER.forEach(q=>{const k=chapOf(q.r);if(k)c[k]=(c[k]||0)+1});return Object.keys(c).sort((a,b)=>a-b).map(k=>`Ch. ${k} (${c[k]})`).join(' · ')}
+function chapCount(){return new Set(VER.filter(q=>q.b==='IBC').map(q=>chapOf(q.r)).filter(Boolean)).size}
+function chapList(){const c={};VER.filter(q=>q.b==='IBC').forEach(q=>{const k=chapOf(q.r);if(k)c[k]=(c[k]||0)+1});return Object.keys(c).sort((a,b)=>a-b).map(k=>`Ch. ${k} (${c[k]})`).join(' · ')}
 function vLocal(m){const L=G.LOCAL;m.innerHTML=`<nav class="crumbs"><a href="#info">Exam info</a> › Local licensing</nav>${head('Colorado licensing','Separate from exam requirements. Checked '+esc(L.checked)+'.')}
  <div class="callout warn">${esc(L.note)}</div><div class="tbl card"><table><thead><tr><th>Jurisdiction</th><th>What it lists</th><th>Status</th></tr></thead><tbody>${L.rows.map(r=>`<tr><td><b>${esc(r[0])}</b></td><td>${esc(r[1])} <a href="${r[3]}" target="_blank" rel="noopener">Source</a></td><td>${esc(r[2])}</td></tr>`).join('')}</tbody></table></div>`}
 
@@ -407,7 +440,7 @@ function vData(m){m.innerHTML=`${head('Data and settings','Progress is saved in 
  <section class="card stack"><h2 class="h3">Export progress</h2><p class="muted">Copy this text and save it somewhere safe (a note or email to yourself).</p><div class="row"><button class="btn" id="exMk">Show export</button><button class="btn" id="exCp" hidden>Copy to clipboard</button></div><textarea id="exT" rows="5" readonly hidden aria-label="Exported progress"></textarea></section>
  <section class="card stack"><h2 class="h3">Import progress</h2><p class="muted">Choose an exported file or paste exported text. This replaces your current progress.</p><div class="field"><label for="imF">File</label><input id="imF" type="file" accept=".json,.txt,application/json,text/plain"></div><div class="field"><label for="imT">Or paste</label><textarea id="imT" rows="4"></textarea></div><div class="row"><button class="btn" id="imGo">Import</button></div><div id="imC"></div></section>
  <section class="card stack danger"><h2 class="h3">Reset all progress</h2><p>This deletes your profile, plan, answers, notes, bookmarks, flashcard history and exam results in this browser. It cannot be undone. Export first if you might want it back.</p><div class="field"><label for="rsT">Type RESET to confirm</label><input id="rsT" autocomplete="off"></div><div class="row"><button class="btn bad" id="rsGo">Reset everything</button></div></section>
- <section class="card stack"><h2 class="h3">About</h2><p>Independent exam preparation. Not affiliated with, endorsed by or sponsored by the International Code Council. All questions are original practice items, not ICC exam questions. Code references are pointers to the 2018 IBC; the code text itself is not reproduced. Items marked "Demonstration" are pending verification and never appear in scored exams.</p><p class="muted">Content: ${G.LESSONS.length} lessons · ${VER.length} verified questions · ${G.Q.length-VER.length} demonstration · ${G.SCENARIOS.length} scenarios · ${G.LOOKUPS.length} lookup drills · ${G.CARDS.length} seed flashcards.</p></section>`;
+ <section class="card stack"><h2 class="h3">About</h2><p>Independent exam preparation. Not affiliated with, endorsed by or sponsored by the International Code Council. All questions are original practice items, not ICC exam questions. Code references are pointers to the 2018 IBC and the Concrete Manual; the text of the books is not reproduced. The code-book reader only opens PDF files you add yourself, and keeps them on your device. Items marked "Demonstration" are pending verification and never appear in scored exams.</p><p class="muted">Content: ${G.LESSONS.length} lessons · ${VER.length} verified questions · ${G.Q.length-VER.length} demonstration · ${G.SCENARIOS.length} scenarios · ${G.LOOKUPS.length} lookup drills · ${G.CARDS.length} seed flashcards.</p></section>`;
  m.querySelectorAll('[data-th]').forEach(b=>b.onclick=()=>{S.theme=b.dataset.th;applyTheme();save();vData(m)});
  $('#exMk').onclick=()=>{const t=$('#exT');t.value=JSON.stringify(Object.assign({},S,{run:null,exported:new Date().toISOString(),app:'g11prep'}));t.hidden=false;$('#exCp').hidden=false;t.select()};
  $('#exCp').onclick=()=>{const t=$('#exT');navigator.clipboard&&navigator.clipboard.writeText(t.value).then(()=>toast('Copied'),()=>{t.select();toast('Press Ctrl+C or Cmd+C to copy')})||(t.select(),toast('Press Ctrl+C or Cmd+C to copy'))};
@@ -419,6 +452,7 @@ function vData(m){m.innerHTML=`${head('Data and settings','Progress is saved in 
  $('#rsGo').onclick=()=>{if($('#rsT').value.trim()!=='RESET'){toast('Type RESET exactly to confirm');return}const th=S.theme;S=blank();S.theme=th;try{localStorage.removeItem(KEY)}catch(e){}save();toast('All progress reset');go('home')}}
 
 /* ---------- boot ---------- */
+const API={get S(){return S},save,toast,esc,head,say,go};
 load();applyTheme();
 $('#nav').innerHTML=NAV.map(n=>`<a href="#${n[0]}" data-r="${n[0]}">${n[1]}</a>`).join('');
 $('#thBtn').onclick=()=>{S.theme=S.theme==='dark'?'light':S.theme==='light'?'system':'dark';applyTheme();save();toast('Theme: '+(S.theme==='system'?'match system':S.theme))};
