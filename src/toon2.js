@@ -374,7 +374,7 @@ ep({id:'C18-1',book:'CM',ch:18,n:1,part:CMn+' Chapter 18',title:'Rebar Before th
  {who:'N',say:'The column cages.',look:['ties','bends'],
   ask:A('Column ties may not be spaced farther apart than:',['8 bar diameters','16 longitudinal bar diameters (and 48 tie diameters and the least dimension)','24 in always','12 in'],1,'Table 18.7. Use No. 3 ties for No. 10 and smaller bars, and No. 4 for No. 11 and larger.')},
  {who:'L',say:'A bar is in the way. The ironworker wants to heat it with a torch and bend it.',
-  ask:A('Bars partly embedded in concrete may be field-bent:',['Hot, always','Cold, unless the engineer approves heat','Never','Only with a torch'],1,'Ch. 18. Never heat a bar red-hot.')},
+  ask:A('Bars partly embedded in concrete may be field-bent:',['Hot, always','Cold, unless heating is approved by the building official with the engineer\'s concurrence','Never','Only with a torch'],1,'18.4: heating to bend needs the building official\'s approval with the engineer\'s concurrence, and then the bar is heated and cooled slowly. Field bending can also reduce ductility (18.5).')},
  {who:'M',say:'One more: someone wants to weld a splice.',
   ask:A('Reinforcing bar intended for welding is ASTM ___, and welding follows ___:',['A615; AWS D1.1','A706; AWS D1.4','A36; AWS D1.4','A706; ACI 117'],1,'Ch. 18: A706 low-alloy bar (marked W). Welding follows AWS D1.4, with no tack welds at crossing bars.')},
  {who:'N',say:'Method recap: identify the member and its exposure, find the cover in Table 18.13, then read the tolerance, spacing and tie rules. The exposure decides the cover.'}],
