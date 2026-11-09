@@ -40,9 +40,7 @@ G11.TOON = {
   ],
   recap:[['Scope and applicability','§§101–102','1–2'],['Department of Building Safety, building official','§§103–104','2'],['Permit required or exempt','§105 (§105.2)','4'],['Floor and roof design loads','§106','6'],['Submittal documents','§107','6'],['Temporary structures and uses','§108','7'],['Fees','§109','7–8']],
   exam:['t101','t102','t103','t104','t105','t106','t107','t108','t109','t110','t111','t112','t113'],
-  next:'Next time: work is underway, and the crew wants to cover it before inspection.'},
- {id:'T2', part:'2018 IBC Chapter 1 · Part 2', title:'Work Underway: Before Inspection', status:'soon',
-  blurb:'Work is underway, and the crew wants to cover it before inspection. Send me the Part 2 script and I will build this episode.'}
+  next:'Next time: work is underway, and the crew wants to cover it before inspection.'}
  ]
 };
 

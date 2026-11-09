@@ -228,8 +228,8 @@ function resultView(m,backHref,filter){const R=S.run;const r=R.res;const v=r.p>=
  m.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>resultView(m,backHref,b.dataset.f));
  const clear=()=>{S.run=null;save()};
  const mk=$('#mkPlan');if(mk)mk.onclick=()=>{clear();genPlan();toast('Study plan created');go('plan')};
- const ag=$('#again');if(ag)ag.onclick=()=>{const k=R.kind;clear();if(k==='toon')$('#main')._xt='toon';go(backHref)};
- $('#done').onclick=()=>{const k=R.kind;clear();if(k==='toon')$('#main')._xt='toon';go(R.kind==='diag'?'home':backHref)};
+ const ag=$('#again');if(ag)ag.onclick=()=>{const k=R.kind;clear();if(k==='toon'){$('#main')._xt='toon';$('#main')._tb=epBook(R.ep)}go(backHref)};
+ $('#done').onclick=()=>{const k=R.kind;clear();if(k==='toon'){$('#main')._xt='toon';$('#main')._tb=epBook(R.ep)}go(R.kind==='diag'?'home':backHref)};
  const af=$('#addFU');if(af)af.onclick=()=>{if(!S.plan)genPlan();const days=S.plan.days.filter(d=>d.day>=today()).slice(0,3);fu.forEach((f,i)=>{const d=days[i%Math.max(1,days.length)];if(!d)return;d.tasks.push({id:d.day+'_f'+Date.now()+i,type:'practice',ref:String(f.d),label:'Follow-up practice: '+DOM[f.d].name,mins:20,done:false});if(f.ls[0])d.tasks.push({id:d.day+'_fl'+Date.now()+i,type:'lesson',ref:f.ls[0].id,label:'Review lesson '+f.ls[0].id,mins:30,done:false})});save();toast('Follow-up tasks added to your plan')}}
 
 /* ---------- Diagnostic ---------- */
@@ -384,8 +384,9 @@ function buildSeries(){const n=90,per=quotas(n),out=[];const rec=q=>S.lastUsed[q
   pools.forEach((pl,i)=>pl.slice(0,take[i]).forEach(q=>out.push(q.id)))});
  const no=3+(S.series||[]).length+1;S.series=S.series||[];S.series.push({no,at:Date.now(),qids:shuffle(out)});save();return S.series[S.series.length-1]}
 function canDraw(n){const per=quotas(n);return [1,2,3,4].every(d=>VER.filter(q=>q.d===d).length>=per[d])}
-function examTabs(m,cur){return `<div class="seg" role="tablist" aria-label="Exam type"><button role="tab" data-xt="mock" aria-selected="${cur==='mock'}">Mock &amp; generated exams</button><button role="tab" data-xt="toon" aria-selected="${cur==='toon'}">ToonBee Method exam</button></div>`}
-function bindTabs(m){m.querySelectorAll('[data-xt]').forEach(b=>b.onclick=()=>{m._xt=b.dataset.xt;vExam(m)})}
+function examTabs(m,cur){const t=cur==='toon'?(m._tb||'IBC'):'';return `<div class="seg" role="tablist" aria-label="Exam type"><button role="tab" data-xt="mock" aria-selected="${cur==='mock'}">Mock &amp; generated exams</button><button role="tab" data-xt="toon" data-tb="IBC" aria-selected="${t==='IBC'}">ToonBee · IBC</button><button role="tab" data-xt="toon" data-tb="CM" aria-selected="${t==='CM'}">ToonBee · Concrete Manual</button></div>`}
+function bindTabs(m){m.querySelectorAll('[data-xt]').forEach(b=>b.onclick=()=>{m._xt=b.dataset.xt;if(b.dataset.tb)m._tb=b.dataset.tb;vExam(m)})}
+const epBook=id=>((G.TOON.episodes.find(e=>e.id===id)||{}).book)||'IBC';
 function vExam(m){if(S.run&&(S.run.kind==='exam'||S.run.kind==='toon')){if(S.run.done)return resultView(m,'exam','all');return runView(m,'exam')}
  const pend=S.pend;if(pend&&pend.type==='toon'){m._xt='toon';S.pend=null;save()}
  if(m._xt==='toon')return vToon(m);
@@ -411,21 +412,27 @@ function vExam(m){if(S.run&&(S.run.kind==='exam'||S.run.kind==='toon')){if(S.run
 /* ---------- ToonBee Method exam ---------- */
 const AV={M:['Maya','var(--d1)'],L:['Luis','var(--d3)'],N:['Narrator','var(--pd)']};
 function methodStrip(active){return `<ol class="method">${G.TOON.method.map((x,i)=>`<li class="${active===i?'on':''}"><span class="mn">${i+1}</span><span><b>${esc(x[0])}</b><small>${esc(x[1])}</small></span></li>`).join('')}</ol>`}
-function vToon(m){const T=G.TOON;S.toon=S.toon||{};
- m.innerHTML=`${head('Practice exams','ToonBee Method: learn each chapter through a short story, then take a timed exam on it.')}${examTabs(m,'toon')}
- <section class="card stack"><h2>The method</h2>${methodStrip(-1)}<p class="muted">Every ToonBee episode and exam question follows these three steps. Finding a familiar heading is only the first step; the language underneath decides the answer.</p></section>
- <div class="grid2">${T.episodes.map(ep=>{const st=S.toon[ep.id]||{};return `<section class="card stack toon-ep ${ep.status==='soon'?'soon':''}"><div class="eyebrow">${esc(ep.part)}</div><h2>${esc(ep.title)}</h2><p class="muted">${esc(ep.blurb)}</p>
-  ${ep.status==='ready'?`<p class="muted">${st.walk?'Walkthrough done':'Walkthrough not started'} · ${st.best!=null?'Best exam '+st.best+'%':'Exam not taken'} · ${ep.exam.length} questions · ${fmtT(ep.exam.length*SEC_PER_Q)}</p><div class="row"><button class="btn primary" data-tw="${ep.id}">Watch-along walkthrough</button><button class="btn" data-tx="${ep.id}">Take the Part exam</button></div>`:'<p><span class="pill warn">Coming next</span></p>'}</section>`}).join('')}</div>`;
+function vToon(m){const T=G.TOON;S.toon=S.toon||{};const bk=m._tb||'IBC';const isCM=bk==='CM';
+ const eps=T.episodes.filter(e=>(e.book||'IBC')===bk&&e.status==='ready');const RM=(T.roadmap||{})[bk]||[];
+ const planned=RM.reduce((a,r)=>a+r[2],0);const done=eps.filter(e=>(S.toon[e.id]||{}).best!=null).length;
+ const card=ep=>{const st=S.toon[ep.id]||{};return `<div class="mock-card toon-ep"><div class="eyebrow">Part ${ep.n||1} · ${ep.exam.length} questions · ${fmtT(ep.exam.length*SEC_PER_Q)}</div><h3>${esc(ep.title)}</h3><p class="muted">${esc(ep.blurb)}</p><p class="muted">${st.walk?'✓ Walkthrough done':'Walkthrough not started'} · ${st.best!=null?'Best exam '+st.best+'%':'Exam not taken'}</p><div class="row"><button class="btn primary sm" data-tw="${ep.id}">Watch-along walkthrough</button><button class="btn sm" data-tx="${ep.id}">Take the Part exam</button></div></div>`};
+ m.innerHTML=`${head('Practice exams',isCM?'ToonBee Method · Concrete Manual: field stories on pour day, then a timed exam on each chapter.':'ToonBee Method · 2018 IBC: one short job-site story per topic, then a timed exam on it.')}${examTabs(m,'toon')}
+ <section class="card stack"><h2>The method</h2>${methodStrip(-1)}<p class="muted">Every ToonBee episode and exam question follows these three steps. Finding a familiar heading is only the first step; the language underneath decides the answer.</p>
+ <div class="grid3"><div class="stat"><span class="lab">Episodes ready</span><b>${eps.length}</b><span class="muted">of about ${planned} planned</span></div><div class="stat"><span class="lab">Exams taken</span><b>${done}</b><span class="muted">${eps.length?Math.round(done/eps.length*100):0}% of ready episodes</span></div><div class="stat"><span class="lab">Book</span><b>${isCM?'Concrete Manual':'2018 IBC'}</b><span class="muted">${isCM?'2021 IBC / ACI 318-19 ed.':'1st printing, Aug 2017'}</span></div></div></section>
+ ${RM.map(r=>{const ch=eps.filter(e=>e.ch===r[0]).sort((a,b)=>(a.n||1)-(b.n||1));const left=Math.max(0,r[2]-ch.length);
+  if(!ch.length)return '';
+  return `<section class="card stack"><div class="eyebrow">${isCM?'Concrete Manual':'2018 IBC'} · Chapter ${r[0]}</div><h2>${esc(r[1])}</h2><div class="grid2">${ch.map(card).join('')}</div>${left?`<p class="muted"><span class="pill warn">Coming</span> ${left} more part${left>1?'s':''} planned for this chapter.</p>`:''}</section>`}).join('')}
+ <section class="card stack"><h2>Coming next</h2><p class="muted">Chapters still to be turned into episodes, with the number of parts planned:</p><ul class="plain">${RM.filter(r=>!eps.some(e=>e.ch===r[0])).map(r=>`<li>Chapter ${r[0]} · ${esc(r[1])} <span class="muted">(${r[2]} part${r[2]>1?'s':''})</span></li>`).join('')}</ul></section>`;
  bindTabs(m);
  m.querySelectorAll('[data-tw]').forEach(b=>b.onclick=()=>toonWalk(m,b.dataset.tw));
- m.querySelectorAll('[data-tx]').forEach(b=>b.onclick=()=>{const ep=T.episodes.find(e=>e.id===b.dataset.tx);startRun('toon',ep.exam.slice(),ep.exam.length*SEC_PER_Q,'ToonBee '+ep.part.replace('2018 IBC ','')+': '+ep.title);S.run.ep=ep.id;save();runView(m,'exam')})}
+ m.querySelectorAll('[data-tx]').forEach(b=>b.onclick=()=>{const ep=T.episodes.find(e=>e.id===b.dataset.tx);startRun('toon',ep.exam.slice(),ep.exam.length*SEC_PER_Q,'ToonBee '+ep.part.replace('2018 IBC ','IBC ')+': '+ep.title);S.run.ep=ep.id;save();runView(m,'exam')})}
 function toonWalk(m,id){const ep=G.TOON.episodes.find(e=>e.id===id);let i=0,first=0,asked=0;
  const draw=()=>{const sc=ep.scenes.slice(0,i+1);const cur=ep.scenes[i];const step=cur.ask?(/open|section/i.test(cur.ask.q)?1:2):(cur.look?0:-1);
   m.innerHTML=`<nav class="crumbs"><a href="#exam" id="tbBack">Practice exams</a> › ToonBee › ${esc(ep.title)}</nav>${head(esc(ep.part)+': '+esc(ep.title),'Scene '+(i+1)+' of '+ep.scenes.length)}
   ${methodStrip(step)}
   <section class="card stack toon-stage" aria-live="polite">${sc.map((s,k)=>`<div class="bubble ${s.who}"><span class="av" style="background:${AV[s.who][1]}">${AV[s.who][0][0]}</span><div><b>${AV[s.who][0]}</b><p>${esc(s.say)}</p>${s.look?`<div class="look"><span class="lab">Lookup words</span>${s.look.map(w=>`<span class="chip">${esc(w)}</span>`).join('')}</div>`:''}</div></div>`).join('')}</section>
   <section class="card stack" id="tbAsk"></section>`;
-  $('#tbBack').onclick=e=>{e.preventDefault();m._xt='toon';vExam(m)};
+  $('#tbBack').onclick=e=>{e.preventDefault();m._xt='toon';m._tb=ep.book||'IBC';vExam(m)};
   const box=$('#tbAsk');
   const nextBtn=()=>i<ep.scenes.length-1?'<button class="btn primary" id="tbNext">Continue</button>':'<button class="btn primary" id="tbDone">Finish walkthrough</button>';
   const wire=()=>{const n=$('#tbNext');if(n)n.onclick=()=>{i++;draw()};const d=$('#tbDone');if(d)d.onclick=finish;(n||d).focus()};
@@ -436,10 +443,10 @@ function toonWalk(m,id){const ep=G.TOON.episodes.find(e=>e.id===id);let i=0,firs
   else{box.innerHTML=`<div class="row">${nextBtn()}</div>`;wire()}};
  const finish=()=>{S.toon=S.toon||{};S.toon[id]=Object.assign({},S.toon[id],{walk:true});save();log('toon','ToonBee walkthrough: '+ep.title,pct(first,asked));
   m.innerHTML=`<nav class="crumbs"><a href="#exam" id="tbBack">Practice exams</a> › ToonBee › ${esc(ep.title)}</nav>${head('Recap: '+esc(ep.title),`First-try checks: ${first} of ${asked}`)}
-  ${methodStrip(-1)}<section class="card stack"><h2 class="h3">Where to look</h2><div class="tbl"><table><thead><tr><th>Issue</th><th>Section</th><th>Page</th></tr></thead><tbody>${ep.recap.map(r=>`<tr><td>${esc(r[0])}</td><td class="num">${esc(r[1])}</td><td class="num">${esc(r[2])}</td></tr>`).join('')}</tbody></table></div><p class="fine">Pages: 2018 IBC, first printing (August 2017).</p></section>
+  ${methodStrip(-1)}<section class="card stack"><h2 class="h3">Where to look</h2><div class="tbl"><table><thead><tr><th>Issue</th><th>${ep.book==='CM'?'Section or table':'Section'}</th><th>${ep.book==='CM'?'Chapter':'Page'}</th></tr></thead><tbody>${ep.recap.map(r=>`<tr><td>${esc(r[0])}</td><td class="num">${esc(r[1])}</td><td class="num">${esc(r[2])}</td></tr>`).join('')}</tbody></table></div><p class="fine">${ep.book==='CM'?'Concrete Manual, 2021 IBC / ACI 318-19 edition. Find the chapter, then the section or table.':'Pages: 2018 IBC, first printing (August 2017).'}</p></section>
   <section class="card stack"><p><b>${esc(ep.next)}</b></p><div class="row"><button class="btn primary big" id="tbExam">Take the ${esc(ep.title)} exam (${ep.exam.length} questions, timed)</button><button class="btn" id="tbBack2">Back to ToonBee</button></div></section>`;
-  const back=()=>{m._xt='toon';vExam(m)};$('#tbBack').onclick=e=>{e.preventDefault();back()};$('#tbBack2').onclick=back;
-  $('#tbExam').onclick=()=>{startRun('toon',ep.exam.slice(),ep.exam.length*SEC_PER_Q,'ToonBee '+ep.part.replace('2018 IBC ','')+': '+ep.title);S.run.ep=ep.id;save();runView(m,'exam')}};
+  const back=()=>{m._xt='toon';m._tb=ep.book||'IBC';vExam(m)};$('#tbBack').onclick=e=>{e.preventDefault();back()};$('#tbBack2').onclick=back;
+  $('#tbExam').onclick=()=>{startRun('toon',ep.exam.slice(),ep.exam.length*SEC_PER_Q,'ToonBee '+ep.part.replace('2018 IBC ','IBC ')+': '+ep.title);S.run.ep=ep.id;save();runView(m,'exam')}};
  draw()}
 
 /* ---------- Flashcards ---------- */
