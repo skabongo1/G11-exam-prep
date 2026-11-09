@@ -178,6 +178,23 @@ details summary{cursor:pointer;font-weight:600;min-height:32px}
 .day.today{border:2px solid var(--d3)}
 .days-list{display:grid;gap:10px}
 @media (max-width:900px){.top{position:static}.runbar{top:env(safe-area-inset-top,0px)}}@media (max-width:560px){.brand span{display:none}}
+.method{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.method li{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:2px solid var(--line);border-radius:12px;background:var(--paper)}
+.method li.on{border-color:var(--d3);background:var(--d3s)}
+.method .mn{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font:800 1rem var(--f-d);background:var(--ink);color:var(--bg)}
+.method b{display:block;font-family:var(--f-d);font-size:1.05rem}.method small{color:var(--muted);font-size:.85rem}
+@media (max-width:640px){.method{grid-template-columns:minmax(0,1fr)}}
+.toon-ep{border-top:6px solid var(--d3)}.toon-ep.soon{opacity:.75;border-top-color:var(--line)}
+.toon-stage{gap:10px}
+.bubble{display:flex;gap:10px;align-items:flex-start;max-width:640px}
+.bubble.L{margin-left:auto;flex-direction:row-reverse;text-align:right}
+.bubble>div{background:var(--soft);border-radius:14px;padding:10px 14px;min-width:0}
+.bubble.N>div{background:var(--pds)}.bubble.M>div{background:var(--d1s)}.bubble.L>div{background:var(--d3s)}
+.bubble p{margin:2px 0 0}
+.av{flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:#fff;font:800 1.1rem var(--f-d)}
+.look{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}.bubble.L .look{justify-content:flex-end}
+.look .lab{font:600 .7rem var(--f-m);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.chip{font:600 .82rem var(--f-m);padding:3px 10px;border-radius:999px;background:var(--paper);border:1.5px solid var(--ink)}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:12px;z-index:60;max-width:calc(100% - 32px);font-weight:600}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
 /* ---- merged: book guides, rule sheets, series, reader ---- */

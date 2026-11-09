@@ -4,6 +4,11 @@ const G=window.G11, $=s=>document.querySelector(s), $$=s=>[...document.querySele
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const DOM={};G.EXAM.domains.forEach(d=>DOM[d.d]=d);
 const DCOL={1:'var(--d1)',2:'var(--d2)',3:'var(--d3)',4:'var(--d4)',0:'var(--pd)'};
+/* Balance answer positions: each question gets a fixed, id-seeded option order. */
+const hashId=x=>{let h=2166136261;for(const c of x){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0};
+const permFor=key=>{let h=hashId(key);const idx=[0,1,2,3];for(let i=3;i>0;i--){h=Math.imul(h^(h>>>13),2246822507)>>>0;const j=h%(i+1);[idx[i],idx[j]]=[idx[j],idx[i]]}return idx};
+G.Q.forEach(q=>{if(!q.o||q.o.length!==4||!Array.isArray(q.w)||q.w.length!==4)return;const idx=permFor(q.id);q.o=idx.map(i=>q.o[i]);q.w=idx.map(i=>q.w[i]);q.a=idx.indexOf(q.a)});
+if(G.TOON)G.TOON.episodes.forEach(ep=>(ep.scenes||[]).forEach((sc,k)=>{if(sc.ask&&sc.ask.o.length===4){const idx=permFor(ep.id+'_'+k+'x');sc.ask.o=idx.map(i=>sc.ask.o[i]);sc.ask.a=idx.indexOf(sc.ask.a)}}));
 const QBY=Object.fromEntries(G.Q.map(q=>[q.id,q]));
 const VER=G.Q.filter(q=>q.v);
 const LBY=Object.fromEntries(G.LESSONS.map(l=>[l.id,l]));
@@ -101,6 +106,7 @@ function qCard(q,i,sel,o){o=o||{};const show=(o.fb||o.mark)&&sel!=null;const bk=
  <div class="qtools"><button class="mini" data-bk="${q.id}" aria-pressed="${bk}">${bk?'★ Bookmarked':'☆ Bookmark'}</button>${o.notes!==false?`<button class="mini" data-note="q:${q.id}">${S.notes['q:'+q.id]?'✎ Edit note':'✎ Add note'}</button>`:''}</div>
  <div class="notebox" data-nb="q:${q.id}" hidden></div></article>`}
 document.addEventListener('click',e=>{const oq=e.target.closest('[data-openq]');if(oq){const q=QBY[oq.dataset.openq];if(q)openQ(q);return}
+ const tb=e.target.closest('[data-toon]');if(tb){S.pend={type:'toon'};save();go('exam');return}
  const b=e.target.closest('[data-bk]');if(b){const id=b.dataset.bk;S.book=S.book.includes(id)?S.book.filter(x=>x!==id):[...S.book,id];save();b.setAttribute('aria-pressed',S.book.includes(id));b.textContent=S.book.includes(id)?'★ Bookmarked':'☆ Bookmark';say(S.book.includes(id)?'Bookmarked':'Bookmark removed');return}
  const n=e.target.closest('[data-note]');if(n){const k=n.dataset.note;const box=document.querySelector(`[data-nb="${CSS.escape(k)}"]`);if(!box)return;box.hidden=!box.hidden;if(!box.hidden){box.innerHTML=`<label class="lbl" for="nt_${k.replace(/\W/g,'_')}">Your note</label><textarea id="nt_${k.replace(/\W/g,'_')}" rows="3">${esc(S.notes[k]||'')}</textarea><div class="row"><button class="btn sm" data-ns="${k}">Save note</button></div>`;box.querySelector('textarea').focus()}return}
  const ns=e.target.closest('[data-ns]');if(ns){const k=ns.dataset.ns;const v=ns.closest('.notebox').querySelector('textarea').value.trim();if(v)S.notes[k]=v;else delete S.notes[k];save();toast('Note saved');ns.closest('.notebox').hidden=true}});
@@ -204,6 +210,7 @@ function finishRun(m,backHref){const R=S.run;if(!R||R.done)return;clearInterval(
  let c=0;const dom={1:[0,0],2:[0,0],3:[0,0],4:[0,0]};R.qids.forEach((id,i)=>{const q=QBY[id];dom[q.d][1]++;const a=R.ans[i];if(a!=null){if(rec(id,a,R.kind,R.tpq[i]))c++,dom[q.d][0]++}S.lastUsed[id]=now});
  const secs=Math.round(Math.min(R.dur||1e9,(now-R.start)/1000));R.done=true;R.res={c,n:R.qids.length,p:pct(c,R.qids.length),dom,secs};
  if(R.kind==='diag'){S.diag={at:now,dom};}
+ if(R.kind==='toon'&&R.ep){S.toon=S.toon||{};const t=S.toon[R.ep]||{};t.best=Math.max(t.best||0,R.res.p);t.runs=(t.runs||0)+1;S.toon[R.ep]=t}
  S.runs.unshift({at:now,kind:R.kind,label:R.label,ser:R.ser||null,c,n:R.qids.length,p:R.res.p,secs,dom});S.runs=S.runs.slice(0,30);
  log(R.kind,R.label,R.res.p);if(R.kind==='exam')autoDone('exam');if(R.kind==='quiz')autoDone('quiz');save();resultView(m,backHref,'all')}
 function followUp(dom){const weak=Object.entries(dom).filter(([d,v])=>v[1]).map(([d,v])=>({d:+d,p:v[0]/v[1]})).sort((a,b)=>a.p-b.p).slice(0,2);
@@ -213,7 +220,7 @@ function resultView(m,backHref,filter){const R=S.run;const r=R.res;const v=r.p>=
  const fu=followUp(r.dom);const idx=R.qids.map((_,i)=>i).filter(i=>filter==='all'||(filter==='wrong'&&R.ans[i]!==QBY[R.qids[i]].a)||(filter==='flag'&&R.flags.includes(i)));
  m.innerHTML=`${head(esc(R.label)+': results',`${r.c} of ${r.n} correct · ${fmtT(r.secs)} used · ${Math.round(r.secs/r.n)} s per question (exam pace 160 s)`)}
  <section class="grid2"><div class="card stack"><div class="big" style="color:${v[1]}">${r.p}%</div><b style="color:${v[1]}">${v[0]}</b><p class="fine">${R.kind==='diag'?'Diagnostic results shape your study plan.':'Practice result only. Not a prediction of your exam score.'}</p>
-  <div class="row">${R.kind==='diag'?'<button class="btn primary big" id="mkPlan">Build my study plan</button>':`<button class="btn primary" id="again">New ${R.kind==='exam'?'exam':'quiz'}</button>`}<button class="btn" id="done">Back</button></div></div>
+  <div class="row">${R.kind==='diag'?'<button class="btn primary big" id="mkPlan">Build my study plan</button>':`<button class="btn primary" id="again">${R.kind==='toon'?'Back to ToonBee':'New '+(R.kind==='exam'?'exam':'quiz')}</button>`}<button class="btn" id="done">Back</button></div></div>
  <div class="card stack"><h2>By exam topic</h2>${[1,2,3,4].filter(d=>r.dom[d][1]).map(d=>{const x=r.dom[d];return `<div class="dbar"><span><b style="color:${DCOL[d]}">${DOM[d].name}</b></span>${bar(pct(x[0],x[1]),DCOL[d])}<b class="num">${pct(x[0],x[1])}% <span class="muted">${x[0]}/${x[1]}</span></b></div>`}).join('')}</div></section>
  ${R.kind!=='diag'&&fu.length?`<section class="card stack"><h2>Targeted follow-up plan</h2>${fu.map(f=>`<div><h3 style="color:${DCOL[f.d]}">${DOM[f.d].name} · ${Math.round(f.p*100)}%</h3><ul class="plain">${f.ls.length?`<li>Lessons: ${f.ls.map(l=>`<a href="#lesson-${l.id}">${l.id} ${esc(l.title)}</a>`).join(', ')}</li>`:'<li>Lessons for this topic are not built yet; use practice questions and the IBC guide.</li>'}${f.sc.length?`<li>Scenarios: ${f.sc.map(s=>`<a href="#scn-${s.id}">${esc(s.title)}</a>`).join(', ')}</li>`:''}<li>Lookups: ${f.lk.map(l=>esc(l.prompt)).join('; ')}</li><li>Practice: 10 questions in this topic</li></ul></div>`).join('')}<div class="row"><button class="btn" id="addFU">Add follow-up to my plan</button></div></section>`:''}
  <section class="card stack"><div class="vh"><h2>Review answers</h2><div class="row" role="group" aria-label="Filter"><button class="btn sm" data-f="all" aria-pressed="${filter==='all'}">All</button><button class="btn sm" data-f="wrong" aria-pressed="${filter==='wrong'}">Wrong</button><button class="btn sm" data-f="flag" aria-pressed="${filter==='flag'}">Flagged</button></div></div>
@@ -221,8 +228,8 @@ function resultView(m,backHref,filter){const R=S.run;const r=R.res;const v=r.p>=
  m.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>resultView(m,backHref,b.dataset.f));
  const clear=()=>{S.run=null;save()};
  const mk=$('#mkPlan');if(mk)mk.onclick=()=>{clear();genPlan();toast('Study plan created');go('plan')};
- const ag=$('#again');if(ag)ag.onclick=()=>{clear();go(backHref)};
- $('#done').onclick=()=>{clear();go(R.kind==='diag'?'home':backHref)};
+ const ag=$('#again');if(ag)ag.onclick=()=>{const k=R.kind;clear();if(k==='toon')$('#main')._xt='toon';go(backHref)};
+ $('#done').onclick=()=>{const k=R.kind;clear();if(k==='toon')$('#main')._xt='toon';go(R.kind==='diag'?'home':backHref)};
  const af=$('#addFU');if(af)af.onclick=()=>{if(!S.plan)genPlan();const days=S.plan.days.filter(d=>d.day>=today()).slice(0,3);fu.forEach((f,i)=>{const d=days[i%Math.max(1,days.length)];if(!d)return;d.tasks.push({id:d.day+'_f'+Date.now()+i,type:'practice',ref:String(f.d),label:'Follow-up practice: '+DOM[f.d].name,mins:20,done:false});if(f.ls[0])d.tasks.push({id:d.day+'_fl'+Date.now()+i,type:'lesson',ref:f.ls[0].id,label:'Review lesson '+f.ls[0].id,mins:30,done:false})});save();toast('Follow-up tasks added to your plan')}}
 
 /* ---------- Diagnostic ---------- */
@@ -252,6 +259,7 @@ function vPlan(m){const P=S.profile;const D=['Sun','Mon','Tue','Wed','Thu','Fri'
 /* ---------- Course ---------- */
 function vLearn(m){m.innerHTML=`${head('Course','Lessons follow the official outline. Rule sheets cover every subtopic from the verified question bank.')}
  <section class="card stack"><div class="vh"><div><div class="eyebrow">All 16 subtopics · both books</div><h2>Rule sheets</h2><p class="muted">Every verified rule in the bank (${VER.length}), grouped by exam subtopic with its section, table or page and a link into your book. Use them to review a module before a practice exam.</p></div><a class="btn primary" href="#rules">Open rule sheets</a></div></section>
+ <section class="card stack"><h2 class="h3">Study method (ToonBee Method)</h2>${methodStrip(-1)}<div class="row"><button class="btn" data-toon="1">Open ToonBee episodes</button></div></section>
  ${G.MODULES.map(md=>`<section class="card stack mod" style="--c:${DCOL[md.d]}"><div class="vh"><div><div class="eyebrow">Module ${md.id} · ${DOM[md.d].name} (${DOM[md.d].w}% of exam)</div><h2>${esc(md.title)}</h2><p class="muted">${esc(md.blurb)}</p></div></div>
  <ol class="lessons">${G.LESSONS.filter(l=>l.mod===md.id).map(l=>{const st=S.lessons[l.id]||{};return `<li><a href="#lesson-${l.id}"><span class="lid">${l.id}</span><span>${esc(l.title)}</span><span class="muted">${l.mins} min</span><span class="st">${st.done?'✓ Done':st.seen?'In progress':''}</span></a></li>`}).join('')}</ol></section>`).join('')}
  <section class="card stack"><h2>Coming next</h2><p class="muted">Full lessons still to build: Use & occupancy and construction types; Fire protection systems; Interior environment and accessibility; Footings and foundations; Floors; Wall framing and stairs; Roof construction; Masonry; Interior finishes; Glass and glazing; Exterior finishes and roof coverings. Until then, use the rule sheets and practice questions, which already cover all of them.</p></section>`}
@@ -344,7 +352,7 @@ function vScn(m,id){const sc=SBY[id];let seed=(m._seed&&m._sid===id)?m._seed:Mat
 
 /* ---------- Lookup trainer ---------- */
 function vLookup(m){const st=stats();const pend=S.pend;S.pend=null;save();let cur=null,t0=0,hints=0,tm=null;let set=m._set||null,si=0;
- m.innerHTML=`${head('Code lookup trainer','Keyword → index → chapter → section or table. Speed and accuracy are tracked separately.')}
+ m.innerHTML=`${head('Code lookup trainer','Keyword → index → chapter → section or table. Speed and accuracy are tracked separately.')}${methodStrip(-1)}
  <section class="tiles"><div class="tile"><span class="lab">Lookups done</span><span class="val">${st.lkN}</span></div><div class="tile"><span class="lab">Correct</span><span class="val">${st.lkN?pct(st.lkOk,st.lkN)+'%':'—'}</span></div><div class="tile"><span class="lab">Avg time (correct)</span><span class="val">${st.lkAvg!=null?Math.round(st.lkAvg)+' s':'—'}</span><span class="muted">Target under 90 s</span></div><div class="tile"><span class="lab">Hints used per lookup</span><span class="val">${S.lookups.length?(S.lookups.reduce((a,x)=>a+x.h,0)/S.lookups.length).toFixed(1):'—'}</span></div></section>
  <div class="card stack" id="lk"><p>Open your 2018 IBC. Press start; the timer runs until you submit the section or table number you found.</p><div class="row"><button class="btn primary big" id="lkGo">Start a 5-lookup drill</button><select id="lkD" aria-label="Topic"><option value="all">All topics</option>${[1,2,3,4].map(d=>`<option value="${d}">${DOM[d].name}</option>`).join('')}</select></div></div>
  <section class="card stack"><h2 class="h3">History</h2>${S.lookups.length?`<div class="tbl"><table><thead><tr><th>Lookup</th><th>Result</th><th>Time</th><th>Hints</th></tr></thead><tbody>${S.lookups.slice(-12).reverse().map(x=>`<tr><td>${esc(LKBY[x.id]?LKBY[x.id].prompt:x.id)}</td><td>${x.ok?'✓':'✗'}</td><td class="num">${Math.round(x.ms/1000)} s</td><td class="num">${x.h}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No lookups yet.</p>'}</section>`;
@@ -376,10 +384,14 @@ function buildSeries(){const n=90,per=quotas(n),out=[];const rec=q=>S.lastUsed[q
   pools.forEach((pl,i)=>pl.slice(0,take[i]).forEach(q=>out.push(q.id)))});
  const no=3+(S.series||[]).length+1;S.series=S.series||[];S.series.push({no,at:Date.now(),qids:shuffle(out)});save();return S.series[S.series.length-1]}
 function canDraw(n){const per=quotas(n);return [1,2,3,4].every(d=>VER.filter(q=>q.d===d).length>=per[d])}
-function vExam(m){if(S.run&&S.run.kind==='exam'){if(S.run.done)return resultView(m,'exam','all');return runView(m,'exam')}
+function examTabs(m,cur){return `<div class="seg" role="tablist" aria-label="Exam type"><button role="tab" data-xt="mock" aria-selected="${cur==='mock'}">Mock &amp; generated exams</button><button role="tab" data-xt="toon" aria-selected="${cur==='toon'}">ToonBee Method exam</button></div>`}
+function bindTabs(m){m.querySelectorAll('[data-xt]').forEach(b=>b.onclick=()=>{m._xt=b.dataset.xt;vExam(m)})}
+function vExam(m){if(S.run&&(S.run.kind==='exam'||S.run.kind==='toon')){if(S.run.done)return resultView(m,'exam','all');return runView(m,'exam')}
+ const pend=S.pend;if(pend&&pend.type==='toon'){m._xt='toon';S.pend=null;save()}
+ if(m._xt==='toon')return vToon(m);
  const SER=G.SERIES||[];const hist=S.runs.filter(r=>r.kind==='exam');const best=id=>{const h=hist.filter(r=>r.ser===id);return h.length?Math.max(...h.map(r=>r.p)):null};
  const gen=[[20,'Quick exam'],[45,'Half-length exam'],[90,'Full-length exam']];
- m.innerHTML=`${head('Practice exams','Verified questions only, weighted by the official outline (19 / 31 / 42 / 8). Timed at the real pace: 4 hours for 90 questions. Explanations come after you submit.')}
+ m.innerHTML=`${head('Practice exams','Verified questions only, weighted by the official outline (19 / 31 / 42 / 8). Timed at the real pace: 4 hours for 90 questions. Explanations come after you submit.')}${examTabs(m,'mock')}
  <section class="card stack"><h2>Mock exam series</h2><p class="muted">${SER.length} fixed full-length exams. No question appears in more than one mock, and each mock covers every subtopic in the official outline. Retake a mock to measure progress on the same set.</p>
  <div class="grid3">${SER.map(x=>{const b=best(x.id);const n=hist.filter(r=>r.ser===x.id).length;return `<div class="mock-card"><div class="eyebrow">${x.qids.length} questions · ${fmtT(x.qids.length*SEC_PER_Q)}</div><h3>${esc(x.title)}</h3><p class="muted">${n?`Taken ${n}× · best ${b}%`:'Not taken yet'}</p><button class="btn primary" data-ser="${x.id}">Start ${esc(x.title)}</button></div>`}).join('')}</div></section>
  <section class="card stack series"><div class="vh"><div><div class="eyebrow">Unlimited · full length</div><h2>Exam series</h2><p class="muted">Each new series is a fresh 90-question exam at the official weights (≈ 17 permits · 28 life safety · 38 structural · 7 envelope), spread across every subtopic, with the real 4-hour (240-minute) clock. Questions you have never seen come first, so each series pushes you through more of the bank. ${S.examMark!==false?'Right and wrong show as you answer (change this in Data &amp; settings).':'Answers stay hidden until you submit.'}</p></div></div>
@@ -394,7 +406,41 @@ function vExam(m){if(S.run&&S.run.kind==='exam'){if(S.run.done)return resultView
  m.querySelectorAll('[data-ser]').forEach(b=>b.onclick=()=>{const x=SER.find(y=>y.id===b.dataset.ser);startRun('exam',x.qids.slice(),x.qids.length*SEC_PER_Q,x.title);S.run.ser=x.id;save();runView(m,'exam')});
  $('#serNew').onclick=()=>{const x=buildSeries();startRun('exam',x.qids.slice(),x.qids.length*SEC_PER_Q,'Exam series #'+x.no);S.run.ser='X'+x.no;save();runView(m,'exam')};
  m.querySelectorAll('[data-xser]').forEach(b=>b.onclick=()=>{const x=S.series.find(y=>y.no===+b.dataset.xser);startRun('exam',shuffle(x.qids),x.qids.length*SEC_PER_Q,'Exam series #'+x.no);S.run.ser='X'+x.no;save();runView(m,'exam')});
- $('#exGo').onclick=()=>{const n=+m.querySelector('input[name=exn]:checked').value;startRun('exam',drawWeighted(n,VER),n*SEC_PER_Q,`Generated exam (${n} Q)`);runView(m,'exam')}}
+ $('#exGo').onclick=()=>{const n=+m.querySelector('input[name=exn]:checked').value;startRun('exam',drawWeighted(n,VER),n*SEC_PER_Q,`Generated exam (${n} Q)`);runView(m,'exam')};bindTabs(m)}
+
+/* ---------- ToonBee Method exam ---------- */
+const AV={M:['Maya','var(--d1)'],L:['Luis','var(--d3)'],N:['Narrator','var(--pd)']};
+function methodStrip(active){return `<ol class="method">${G.TOON.method.map((x,i)=>`<li class="${active===i?'on':''}"><span class="mn">${i+1}</span><span><b>${esc(x[0])}</b><small>${esc(x[1])}</small></span></li>`).join('')}</ol>`}
+function vToon(m){const T=G.TOON;S.toon=S.toon||{};
+ m.innerHTML=`${head('Practice exams','ToonBee Method: learn each chapter through a short story, then take a timed exam on it.')}${examTabs(m,'toon')}
+ <section class="card stack"><h2>The method</h2>${methodStrip(-1)}<p class="muted">Every ToonBee episode and exam question follows these three steps. Finding a familiar heading is only the first step; the language underneath decides the answer.</p></section>
+ <div class="grid2">${T.episodes.map(ep=>{const st=S.toon[ep.id]||{};return `<section class="card stack toon-ep ${ep.status==='soon'?'soon':''}"><div class="eyebrow">${esc(ep.part)}</div><h2>${esc(ep.title)}</h2><p class="muted">${esc(ep.blurb)}</p>
+  ${ep.status==='ready'?`<p class="muted">${st.walk?'Walkthrough done':'Walkthrough not started'} · ${st.best!=null?'Best exam '+st.best+'%':'Exam not taken'} · ${ep.exam.length} questions · ${fmtT(ep.exam.length*SEC_PER_Q)}</p><div class="row"><button class="btn primary" data-tw="${ep.id}">Watch-along walkthrough</button><button class="btn" data-tx="${ep.id}">Take the Part exam</button></div>`:'<p><span class="pill warn">Coming next</span></p>'}</section>`}).join('')}</div>`;
+ bindTabs(m);
+ m.querySelectorAll('[data-tw]').forEach(b=>b.onclick=()=>toonWalk(m,b.dataset.tw));
+ m.querySelectorAll('[data-tx]').forEach(b=>b.onclick=()=>{const ep=T.episodes.find(e=>e.id===b.dataset.tx);startRun('toon',ep.exam.slice(),ep.exam.length*SEC_PER_Q,'ToonBee '+ep.part.replace('2018 IBC ','')+': '+ep.title);S.run.ep=ep.id;save();runView(m,'exam')})}
+function toonWalk(m,id){const ep=G.TOON.episodes.find(e=>e.id===id);let i=0,first=0,asked=0;
+ const draw=()=>{const sc=ep.scenes.slice(0,i+1);const cur=ep.scenes[i];const step=cur.ask?(/open|section/i.test(cur.ask.q)?1:2):(cur.look?0:-1);
+  m.innerHTML=`<nav class="crumbs"><a href="#exam" id="tbBack">Practice exams</a> › ToonBee › ${esc(ep.title)}</nav>${head(esc(ep.part)+': '+esc(ep.title),'Scene '+(i+1)+' of '+ep.scenes.length)}
+  ${methodStrip(step)}
+  <section class="card stack toon-stage" aria-live="polite">${sc.map((s,k)=>`<div class="bubble ${s.who}"><span class="av" style="background:${AV[s.who][1]}">${AV[s.who][0][0]}</span><div><b>${AV[s.who][0]}</b><p>${esc(s.say)}</p>${s.look?`<div class="look"><span class="lab">Lookup words</span>${s.look.map(w=>`<span class="chip">${esc(w)}</span>`).join('')}</div>`:''}</div></div>`).join('')}</section>
+  <section class="card stack" id="tbAsk"></section>`;
+  $('#tbBack').onclick=e=>{e.preventDefault();m._xt='toon';vExam(m)};
+  const box=$('#tbAsk');
+  const nextBtn=()=>i<ep.scenes.length-1?'<button class="btn primary" id="tbNext">Continue</button>':'<button class="btn primary" id="tbDone">Finish walkthrough</button>';
+  const wire=()=>{const n=$('#tbNext');if(n)n.onclick=()=>{i++;draw()};const d=$('#tbDone');if(d)d.onclick=finish;(n||d).focus()};
+  if(cur.ask){asked++;let tries=0;box.innerHTML=`<div class="eyebrow">Your turn</div><h2 class="h3">${esc(cur.ask.q)}</h2><div class="opts">${cur.ask.o.map((o,j)=>`<button class="opt" data-j="${j}"><span class="lt">${L4[j]}</span><span>${esc(o)}</span></button>`).join('')}</div><div id="tbFb" aria-live="polite"></div>`;
+   box.querySelector('.opts').onclick=e=>{const b=e.target.closest('.opt');if(!b||b.disabled)return;const j=+b.dataset.j;tries++;const ok=j===cur.ask.a;if(ok&&tries===1)first++;b.classList.add(ok?'right':'wrong');b.disabled=true;
+    if(ok){box.querySelectorAll('.opt').forEach(z=>z.disabled=true);$('#tbFb').innerHTML=`<div class="fb good"><b>Correct.</b> ${esc(cur.ask.fb)}</div><div class="row">${nextBtn()}</div>`;wire()}
+    else $('#tbFb').innerHTML=`<div class="fb bad"><b>Not quite.</b> Go back to the method: identify the issue, find the section, then read its conditions. Try again.</div>`}}
+  else{box.innerHTML=`<div class="row">${nextBtn()}</div>`;wire()}};
+ const finish=()=>{S.toon=S.toon||{};S.toon[id]=Object.assign({},S.toon[id],{walk:true});save();log('toon','ToonBee walkthrough: '+ep.title,pct(first,asked));
+  m.innerHTML=`<nav class="crumbs"><a href="#exam" id="tbBack">Practice exams</a> › ToonBee › ${esc(ep.title)}</nav>${head('Recap: '+esc(ep.title),`First-try checks: ${first} of ${asked}`)}
+  ${methodStrip(-1)}<section class="card stack"><h2 class="h3">Where to look</h2><div class="tbl"><table><thead><tr><th>Issue</th><th>Section</th><th>Page</th></tr></thead><tbody>${ep.recap.map(r=>`<tr><td>${esc(r[0])}</td><td class="num">${esc(r[1])}</td><td class="num">${esc(r[2])}</td></tr>`).join('')}</tbody></table></div><p class="fine">Pages: 2018 IBC, first printing (August 2017).</p></section>
+  <section class="card stack"><p><b>${esc(ep.next)}</b></p><div class="row"><button class="btn primary big" id="tbExam">Take the ${esc(ep.title)} exam (${ep.exam.length} questions, timed)</button><button class="btn" id="tbBack2">Back to ToonBee</button></div></section>`;
+  const back=()=>{m._xt='toon';vExam(m)};$('#tbBack').onclick=e=>{e.preventDefault();back()};$('#tbBack2').onclick=back;
+  $('#tbExam').onclick=()=>{startRun('toon',ep.exam.slice(),ep.exam.length*SEC_PER_Q,'ToonBee '+ep.part.replace('2018 IBC ','')+': '+ep.title);S.run.ep=ep.id;save();runView(m,'exam')}};
+ draw()}
 
 /* ---------- Flashcards ---------- */
 function vCards(m){const decks=[['all','All decks'],['t','Terminology'],['c','Concepts and values'],['l','Reference locations'],['m','My missed questions'],['u','My cards']];let deck=m._deck||'all';
