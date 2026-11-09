@@ -14,7 +14,7 @@ cut = shell.index('</style>') + len('</style>')
 head_part, body_part = shell[:cut], shell[cut:]
 
 scripts = ''
-for f in ['content.js', 'content2.js', 'content3.js', 'content4.js', 'content5.js', 'toon.js', 'toon2.js', 'series.js', 'scenarios.js', 'guides.js', 'reader.js', 'fx.js', 'app.js']:
+for f in ['content.js', 'content2.js', 'content3.js', 'content4.js', 'content5.js', 'toon.js', 'toon2.js', 'toon3.js', 'series.js', 'scenarios.js', 'guides.js', 'reader.js', 'fx.js', 'app.js']:
     scripts += '\n<script>\n' + open(os.path.join(SRC, f), encoding='utf-8').read() + '\n</script>'
 
 pwa_head = f'''<!doctype html>

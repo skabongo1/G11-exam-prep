@@ -26,4 +26,4 @@ Each build gets a new version number. When an update is published, the app shows
 python3 build.py src
 ```
 
-`src/` holds the course content (`content*.js`, `toon.js` and `toon2.js` for the ToonBee Method episodes (IBC and Concrete Manual), `series.js`, `scenarios.js`, `guides.js`), the reader (`reader.js`), the app logic (`app.js`) and the page shell (`shell.html`). The build writes `index.html`, `sw.js` and `manifest.webmanifest`.
+`src/` holds the course content (`content*.js`, `toon.js`, `toon2.js` and `toon3.js` for the ToonBee Method episodes (IBC and Concrete Manual), `series.js`, `scenarios.js`, `guides.js`), the reader (`reader.js`), the app logic (`app.js`) and the page shell (`shell.html`). The build writes `index.html`, `sw.js` and `manifest.webmanifest`.
