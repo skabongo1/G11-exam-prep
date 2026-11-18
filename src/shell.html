@@ -251,9 +251,24 @@ ol.rules{margin:0;padding-left:22px;display:grid;gap:8px}ol.rules .ref{color:var
 .fx-flash{animation:fxflash .6s ease}@keyframes fxflash{50%{box-shadow:0 0 0 4px var(--bad)}}
 .fx-reveal{animation:fxrev 1.2s ease .3s}@keyframes fxrev{50%{box-shadow:0 0 0 4px var(--ok)}}
 @media (prefers-reduced-motion:reduce){.fx-pop,.fx-shake,.fx-reveal{animation:none}}
+/* accounts */
+.acc-top{gap:8px;flex-wrap:nowrap}.acc-btn{display:inline-flex;align-items:center;gap:8px;max-width:46vw}.acc-nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acc-av{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;color:#fff;font-weight:800;font-size:.85rem;flex:none}
+.acc-av.big{width:56px;height:56px;font-size:1.5rem}
+.acc-me{display:flex;gap:16px;align-items:center}.acc-me h2{margin:0}
+.acc-col{width:34px;height:34px;border-radius:50%;border:3px solid transparent;cursor:pointer;padding:0}.acc-col[aria-checked=true]{border-color:var(--ink);box-shadow:0 0 0 2px var(--paper) inset}
+.acc-list{display:grid;gap:10px}.acc-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}.acc-row:first-child{border-top:0}
+.acc-rmbox{grid-column:1/-1}
+.acc-hint{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;border-left:6px solid var(--d1)}.acc-hint p{margin:.2em 0 0}
+.acc-ov{position:fixed;inset:0;z-index:80;background:rgba(10,16,30,.55);display:grid;place-items:center;padding:16px}
+.acc-who,.acc-pin{width:min(560px,100%);max-height:90vh;overflow:auto}.acc-pin{width:min(360px,100%)}
+.acc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px}
+.acc-pick{display:grid;justify-items:center;gap:8px;padding:16px 8px;border:2px solid var(--line);border-radius:14px;background:var(--paper);color:var(--ink);cursor:pointer;font:inherit}
+.acc-pick:hover,.acc-pick:focus-visible{border-color:var(--d1)}
+@media (max-width:560px){.acc-row{grid-template-columns:auto minmax(0,1fr)}.acc-row>.row{grid-column:1/-1}.acc-nm{max-width:28vw}}
 </style>
 <a class="skip" href="#main">Skip to content</a>
-<header class="top"><div class="in"><div class="brand"><b>G11 Exam Prep</b><span>Independent study app · not affiliated with ICC</span></div><button class="btn sm" id="thBtn" aria-label="Change color theme">◐ Theme</button></div><div class="stripe" aria-hidden="true"></div></header>
+<header class="top"><div class="in"><div class="brand"><b>G11 Exam Prep</b><span>Independent study app · not affiliated with ICC</span></div><div class="row acc-top"><button class="btn sm acc-btn" id="accBtn" aria-label="Accounts"></button><button class="btn sm" id="thBtn" aria-label="Change color theme">◐ Theme</button></div></div><div class="stripe" aria-hidden="true"></div></header>
 <div class="shell"><nav id="nav" aria-label="Main"></nav><main id="main" tabindex="-1"></main></div>
 <div class="shell" style="padding-block:0 30px"><span></span><p class="disclaim">Independent exam preparation. Not affiliated with, endorsed by or sponsored by the International Code Council. Practice questions are original and are not actual ICC exam questions. Code references point to the 2018 International Building Code, first printing; code text is not reproduced.</p></div>
 <div id="toast" role="status" hidden></div><div id="live" class="sr" aria-live="polite"></div>

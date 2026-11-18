@@ -27,9 +27,22 @@ const KEY='g11prep.v1';
 const blank=()=>({v:1,created:Date.now(),theme:'system',profile:{onboarded:false,examDate:'',jur:'',ibc:'2018',cm:'',level:'',hours:10,days:[1,2,3,4,5]},
  diag:null,plan:null,lessons:{},att:{},book:[],missed:[],notes:{},lookups:[],scen:{},runs:[],run:null,lastUsed:{},cards:{},custom:[],log:[],pend:null,books:{},series:[],fx:true,examMark:true});
 let S;
-function load(){try{const r=localStorage.getItem(KEY);S=r?Object.assign(blank(),JSON.parse(r)):blank()}catch(e){S=blank()}}
+/* ---- accounts: each person on this device keeps separate progress ---- */
+const REG='g11prep.accounts';
+const ACOL=['#2f6fde','#d6452f','#1f9d6b','#a259d9','#e08a00','#0f8f9f'];
+let ACC;
+function regLoad(){try{ACC=JSON.parse(localStorage.getItem(REG)||'null')}catch(e){ACC=null}
+ if(!ACC||!Array.isArray(ACC.list)||!ACC.list.length)ACC={active:'a1',ask:true,hint:true,list:[{id:'a1',name:'Me',color:ACOL[0],created:Date.now()}]};
+ if(!ACC.list.some(a=>a.id===ACC.active))ACC.active=ACC.list[0].id}
+function regSave(){try{localStorage.setItem(REG,JSON.stringify(ACC))}catch(e){}}
+const accKey=id=>id==='a1'?KEY:KEY+'.'+id;   // the first account keeps the original storage key, so existing progress carries over
+const curAcc=()=>ACC.list.find(a=>a.id===ACC.active);
+const pinHash=p=>{let h=5381;for(const c of 'g11:'+p)h=(h*33^c.charCodeAt(0))>>>0;return h.toString(36)};
+function peekAcc(id){try{const d=JSON.parse(localStorage.getItem(accKey(id))||'null');if(!d)return {ans:0,runs:0,last:null};return {ans:Object.keys(d.att||{}).length,runs:(d.runs||[]).length,last:(d.log&&d.log[0]&&d.log[0].at)||null}}catch(e){return {ans:0,runs:0,last:null}}}
+function load(){try{const r=localStorage.getItem(accKey(ACC.active));S=r?Object.assign(blank(),JSON.parse(r)):blank()}catch(e){S=blank()}}
 let saveT=null;
-function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('Progress could not be saved in this browser. Use Export to keep a copy.')}},120)}
+function writeNow(){clearTimeout(saveT);saveT=null;try{localStorage.setItem(accKey(ACC.active),JSON.stringify(S))}catch(e){toast('Progress could not be saved in this browser. Use Export to keep a copy.')}}
+function save(){clearTimeout(saveT);saveT=setTimeout(writeNow,120)}
 function log(kind,label,score){S.log.unshift({at:Date.now(),kind,label,score});S.log=S.log.slice(0,40);save()}
 
 /* ---------------- theme ---------------- */
@@ -112,11 +125,11 @@ document.addEventListener('click',e=>{const oq=e.target.closest('[data-openq]');
  const ns=e.target.closest('[data-ns]');if(ns){const k=ns.dataset.ns;const v=ns.closest('.notebox').querySelector('textarea').value.trim();if(v)S.notes[k]=v;else delete S.notes[k];save();toast('Note saved');ns.closest('.notebox').hidden=true}});
 
 /* ---------------- routing ---------------- */
-const NAV=[['home','Dashboard'],['plan','Study plan'],['learn','Course'],['practice','Practice'],['scenarios','Scenarios'],['lookup','Lookup trainer'],['reader','My code books'],['guides','Book guides'],['exam','Practice exams'],['cards','Flashcards'],['info','Exam info'],['data','Data & settings']];
+const NAV=[['home','Dashboard'],['plan','Study plan'],['learn','Course'],['practice','Practice'],['scenarios','Scenarios'],['lookup','Lookup trainer'],['reader','My code books'],['guides','Book guides'],['exam','Practice exams'],['cards','Flashcards'],['info','Exam info'],['account','Accounts'],['data','Data & settings']];
 let timer=null;
 function route(){clearInterval(timer);timer=null;const h=(location.hash||'#home').slice(1)||'home';const main=$('#main');
  const base=h.split('-')[0];$$('#nav a').forEach(a=>a.setAttribute('aria-current',a.dataset.r===base||(base==='lesson'&&a.dataset.r==='learn')||(base==='scn'&&a.dataset.r==='scenarios')||(base==='diagnostic'&&a.dataset.r==='home')||(base==='start'&&a.dataset.r==='home')||(base==='local'&&a.dataset.r==='info')||(base==='rules'&&a.dataset.r==='learn')?'page':'false'));
- const V={home:vHome,start:vStart,diagnostic:vDiag,plan:vPlan,learn:vLearn,practice:vPractice,scenarios:vScenarios,lookup:vLookup,exam:vExam,cards:vCards,info:vInfo,local:vLocal,data:vData,reader:m=>G.READER.view(m,API),guides:m=>G.GUIDES.view(m,API),rules:vRules};
+ const V={home:vHome,start:vStart,diagnostic:vDiag,plan:vPlan,learn:vLearn,practice:vPractice,scenarios:vScenarios,lookup:vLookup,exam:vExam,cards:vCards,info:vInfo,local:vLocal,data:vData,account:vAccount,reader:m=>G.READER.view(m,API),guides:m=>G.GUIDES.view(m,API),rules:vRules};
  if(h.startsWith('lesson-')&&LBY[h.slice(7)])vLesson(main,h.slice(7));else if(h.startsWith('scn-')&&SBY[h.slice(4)])vScn(main,h.slice(4));else (V[h]||vHome)(main);
  main.focus({preventScroll:true});window.scrollTo(0,0)}
 window.addEventListener('hashchange',route);
@@ -131,7 +144,7 @@ function vHome(m){const st=stats(),rd=readiness(st),P=S.profile;const tp=todayPl
  const next=tasks&&tasks.tasks.find(k=>!k.done);const lessonsDone=G.LESSONS.filter(l=>S.lessons[l.id]&&S.lessons[l.id].done).length;
  const {due,nw}=dueCards('all');const exd=dayFromISO(P.examDate);const dl=exd?exd-today():null;
  const weakSubs=Object.entries(st.sub).filter(([k,v])=>v[1]>=2).map(([k,v])=>({k,p:v[0]/v[1],n:v[1]})).sort((a,b)=>a.p-b.p).slice(0,4);
- m.innerHTML=`${!P.onboarded?`<section class="hero card"><h2>Set up your study plan</h2><p>Tell me your exam date, jurisdiction, books and study time. A 12-question diagnostic then shapes a daily plan around the official exam weights.</p><div class="row"><a class="btn primary big" href="#start">Start setup</a><a class="btn" href="#learn">Browse the course first</a></div></section>`:''}
+ m.innerHTML=`${ACC.hint&&ACC.list.length<2?`<section class="card acc-hint"><div><b>Sharing this app with someone?</b><p class="muted">Give each person an account so each of you keeps your own plan, scores and flashcards on this device.</p></div><div class="row"><a class="btn primary sm" href="#account">Set up accounts</a><button class="btn sm" id="accHintX">Not now</button></div></section>`:''}${!P.onboarded?`<section class="hero card"><h2>Set up your study plan</h2><p>Tell me your exam date, jurisdiction, books and study time. A 12-question diagnostic then shapes a daily plan around the official exam weights.</p><div class="row"><a class="btn primary big" href="#start">Start setup</a><a class="btn" href="#learn">Browse the course first</a></div></section>`:''}
  ${head('Dashboard',P.onboarded?`${esc(P.jur||'Jurisdiction not set')} · ${dl!=null?(dl>=0?dl+' days to exam':'Exam date passed'):'No exam date'} · ${P.hours} h/week`:'Independent G11 exam preparation')}
  <section class="grid2">
   <div class="card stack"><h2>Today</h2>${tasks?`<p class="muted">${tp?'Today, '+dayStr(tp.day):'Next study day: '+dayStr(np.day)}</p><ul class="tasks">${tasks.tasks.map(k=>`<li class="${k.done?'done':''}"><input type="checkbox" id="tk_${k.id}" data-tk="${k.id}" ${k.done?'checked':''}><label for="tk_${k.id}">${esc(k.label)} <span class="muted">· ${k.mins} min</span></label><button class="mini" data-go="${k.id}">Open</button></li>`).join('')}</ul>`:`<p class="muted">No plan yet. Set up your plan to get daily tasks.</p>`}
@@ -489,7 +502,7 @@ function vLocal(m){const L=G.LOCAL;m.innerHTML=`<nav class="crumbs"><a href="#in
  <div class="callout warn">${esc(L.note)}</div><div class="tbl card"><table><thead><tr><th>Jurisdiction</th><th>What it lists</th><th>Status</th></tr></thead><tbody>${L.rows.map(r=>`<tr><td><b>${esc(r[0])}</b></td><td>${esc(r[1])} <a href="${r[3]}" target="_blank" rel="noopener">Source</a></td><td>${esc(r[2])}</td></tr>`).join('')}</tbody></table></div>`}
 
 /* ---------- Data & settings ---------- */
-function vData(m){m.innerHTML=`${head('Data and settings','Progress is saved in this browser. Export a copy to move it or keep a backup.')}
+function vData(m){m.innerHTML=`${head('Data and settings',`Settings and progress for <b>${esc(curAcc().name)}</b> are saved in this browser. Export a copy to move them or keep a backup.`)}
  <section class="card stack"><h2 class="h3">Appearance</h2><div class="seg" role="radiogroup" aria-label="Theme">${[['system','Match system'],['light','Light'],['dark','Dark']].map(t=>`<button role="radio" aria-checked="${S.theme===t[0]}" data-th="${t[0]}">${t[1]}</button>`).join('')}</div></section>
  <section class="card stack"><h2 class="h3">Answer effects</h2>
   <label class="chk big"><input type="checkbox" id="setFx" ${S.fx!==false?'checked':''}> Fireworks when you get it right, shake when it's wrong</label>
@@ -498,7 +511,7 @@ function vData(m){m.innerHTML=`${head('Data and settings','Progress is saved in 
   <div class="row"><button class="btn sm" id="setTry">Try the fireworks</button></div></section>
  <section class="card stack"><h2 class="h3">Export progress</h2><p class="muted">Copy this text and save it somewhere safe (a note or email to yourself).</p><div class="row"><button class="btn" id="exMk">Show export</button><button class="btn" id="exCp" hidden>Copy to clipboard</button></div><textarea id="exT" rows="5" readonly hidden aria-label="Exported progress"></textarea></section>
  <section class="card stack"><h2 class="h3">Import progress</h2><p class="muted">Choose an exported file or paste exported text. This replaces your current progress.</p><div class="field"><label for="imF">File</label><input id="imF" type="file" accept=".json,.txt,application/json,text/plain"></div><div class="field"><label for="imT">Or paste</label><textarea id="imT" rows="4"></textarea></div><div class="row"><button class="btn" id="imGo">Import</button></div><div id="imC"></div></section>
- <section class="card stack danger"><h2 class="h3">Reset all progress</h2><p>This deletes your profile, plan, answers, notes, bookmarks, flashcard history and exam results in this browser. It cannot be undone. Export first if you might want it back.</p><div class="field"><label for="rsT">Type RESET to confirm</label><input id="rsT" autocomplete="off"></div><div class="row"><button class="btn bad" id="rsGo">Reset everything</button></div></section>
+ <section class="card stack danger"><h2 class="h3">Reset ${esc(curAcc().name)}'s progress</h2><p>This deletes ${esc(curAcc().name)}'s study profile, plan, answers, notes, bookmarks, flashcard history and exam results in this browser. It cannot be undone. Export first if you might want it back.</p><div class="field"><label for="rsT">Type RESET to confirm</label><input id="rsT" autocomplete="off"></div><div class="row"><button class="btn bad" id="rsGo">Reset ${esc(curAcc().name)}'s progress</button></div></section>
  <section class="card stack"><h2 class="h3">About</h2><p>Independent exam preparation. Not affiliated with, endorsed by or sponsored by the International Code Council. All questions are original practice items, not ICC exam questions. Code references are pointers to the 2018 IBC and the Concrete Manual; the text of the books is not reproduced. The code-book reader only opens PDF files you add yourself, and keeps them on your device. Items marked "Demonstration" are pending verification and never appear in scored exams.</p><p class="muted">Content: ${G.LESSONS.length} lessons · ${VER.length} verified questions · ${G.Q.length-VER.length} demonstration · ${G.SCENARIOS.length} scenarios · ${G.LOOKUPS.length} lookup drills · ${G.CARDS.length} seed flashcards.</p></section>`;
  m.querySelectorAll('[data-th]').forEach(b=>b.onclick=()=>{S.theme=b.dataset.th;applyTheme();save();vData(m)});
  $('#setFx').onchange=e=>{S.fx=e.target.checked;save();toast(S.fx?'Effects on':'Effects off')};$('#setMark').onchange=e=>{S.examMark=e.target.checked;save();toast(S.examMark?'Right/wrong shown during exams':'Answers hidden until you submit')};
@@ -510,12 +523,65 @@ function vData(m){m.innerHTML=`${head('Data and settings','Progress is saved in 
   if(!d||d.app!=='g11prep'||d.v!==1){$('#imC').innerHTML='<p class="err">This does not look like a G11 Exam Prep export.</p>';return}
   $('#imC').innerHTML=`<div class="confirm"><b>Replace current progress with the export from ${esc(d.exported||'unknown date')}?</b><div class="row"><button class="btn primary" id="imY">Replace</button><button class="btn" id="imN">Cancel</button></div></div>`;
   $('#imY').onclick=()=>{S=Object.assign(blank(),d);delete S.exported;delete S.app;save();applyTheme();toast('Progress imported');go('home')};$('#imN').onclick=()=>$('#imC').innerHTML=''};
- $('#rsGo').onclick=()=>{if($('#rsT').value.trim()!=='RESET'){toast('Type RESET exactly to confirm');return}const th=S.theme;S=blank();S.theme=th;try{localStorage.removeItem(KEY)}catch(e){}save();toast('All progress reset');go('home')}}
+ $('#rsGo').onclick=()=>{if($('#rsT').value.trim()!=='RESET'){toast('Type RESET exactly to confirm');return}const th=S.theme;S=blank();S.theme=th;try{localStorage.removeItem(accKey(ACC.active))}catch(e){}save();toast('All progress reset');go('home')}}
+
+/* ---------- Accounts ---------- */
+const pl=(n,one,many)=>n+' '+(n===1?one:(many||one+'s'));
+const accAv=(a,big)=>`<span class="acc-av${big?' big':''}" style="background:${a.color}" aria-hidden="true">${esc((a.name.trim()[0]||'?').toUpperCase())}</span>`;
+function accChip(){const a=curAcc();$('#accBtn').innerHTML=`${accAv(a)}<span class="acc-nm">${esc(a.name)}</span>`;$('#accBtn').setAttribute('aria-label','Account: '+a.name+'. Switch or manage accounts')}
+function switchAcc(id,to){writeNow();ACC.active=id;regSave();try{sessionStorage.setItem('g11who',id)}catch(e){}load();applyTheme();accChip();toast('Studying as '+curAcc().name);go(to||'home')}
+function askPin(a,ok){const o=document.createElement('div');o.className='acc-ov';
+ o.innerHTML=`<div class="card stack acc-pin" role="dialog" aria-modal="true" aria-labelledby="pinH"><h2 id="pinH" class="h3">${accAv(a)} ${esc(a.name)}</h2><div class="field"><label for="pinI">PIN</label><input id="pinI" type="password" inputmode="numeric" maxlength="8" autocomplete="off"></div><p class="err" id="pinE" hidden>That PIN doesn't match.</p><div class="row"><button class="btn primary" id="pinY">Open</button><button class="btn" id="pinN">Cancel</button></div></div>`;
+ document.body.appendChild(o);const i=o.querySelector('#pinI');i.focus();
+ const tryIt=()=>{if(pinHash(i.value.trim())===a.pin){o.remove();ok()}else{o.querySelector('#pinE').hidden=false;i.select()}};
+ o.querySelector('#pinY').onclick=tryIt;i.onkeydown=e=>{if(e.key==='Enter')tryIt();if(e.key==='Escape')o.remove()};o.querySelector('#pinN').onclick=()=>o.remove()}
+function openAcc(id,to){const a=ACC.list.find(x=>x.id===id);if(!a)return;if(id===ACC.active){go(to||'home');return}if(a.pin)askPin(a,()=>switchAcc(id,to));else switchAcc(id,to)}
+function whoPicker(){const o=document.createElement('div');o.className='acc-ov who';
+ o.innerHTML=`<div class="card stack acc-who" role="dialog" aria-modal="true" aria-labelledby="whoH"><h2 id="whoH">Who's studying?</h2><p class="muted">Each person has their own plan, scores, notes and flashcards.</p><div class="acc-grid">${ACC.list.map(a=>`<button class="acc-pick" data-who="${a.id}">${accAv(a,1)}<b>${esc(a.name)}</b>${a.pin?'<span class="muted small">PIN</span>':''}</button>`).join('')}</div><div class="row"><a class="btn sm" href="#account" id="whoMg">Manage accounts</a></div></div>`;
+ document.body.appendChild(o);
+ o.querySelectorAll('[data-who]').forEach(b=>b.onclick=()=>{const a=ACC.list.find(x=>x.id===b.dataset.who);
+  const done=()=>{o.remove();try{sessionStorage.setItem('g11who',a.id)}catch(e){}if(a.id===ACC.active){toast('Studying as '+a.name);route()}else switchAcc(a.id)};
+  if(a.pin)askPin(a,done);else done()});
+ o.querySelector('#whoMg').onclick=()=>{o.remove();try{sessionStorage.setItem('g11who',ACC.active)}catch(e){}};
+ o.querySelector('[data-who]').focus()}
+function vAccount(m){const a=curAcc();const when=t=>t?new Date(t).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'none yet';
+ const me=peekAcc(a.id);
+ m.innerHTML=`${head('Accounts','Everyone who studies on this device gets their own account. Progress never mixes between accounts.')}
+ <section class="card stack"><div class="acc-me">${accAv(a,1)}<div><div class="eyebrow">Studying now</div><h2>${esc(a.name)}</h2><p class="muted">${pl(me.ans,'question')} answered · ${pl(me.runs,'quiz or exam','quizzes and exams')} · last activity ${when(me.last)}</p></div></div>
+  <div class="field"><label for="acNm">Name</label><div class="row"><input id="acNm" maxlength="24" value="${esc(a.name)}"><button class="btn sm" id="acNmGo">Save name</button></div></div>
+  <div class="field"><span class="lbl" id="acColL">Color</span><div class="row" role="radiogroup" aria-labelledby="acColL">${ACOL.map((c,k)=>`<button class="acc-col" role="radio" aria-checked="${a.color===c}" data-col="${c}" style="background:${c}" aria-label="Color ${k+1}"></button>`).join('')}</div></div>
+  <div class="field"><span class="lbl">PIN (optional)</span><p class="muted small">A PIN stops someone from opening your account by mistake. It is not a password: anyone using this device and the browser's developer tools could still read the saved data.</p><div class="row">${a.pin?`<button class="btn sm" id="acPinX">Remove PIN</button>`:`<input id="acPin" type="password" inputmode="numeric" maxlength="8" placeholder="4–8 digits" aria-label="New PIN" autocomplete="off"><button class="btn sm" id="acPinGo">Set PIN</button>`}</div></div></section>
+ <section class="card stack"><h2 class="h3">Everyone on this device</h2><div class="acc-list">${ACC.list.map(x=>{const p=peekAcc(x.id);return `<div class="acc-row">${accAv(x)}<div class="acc-info"><b>${esc(x.name)}</b>${x.id===ACC.active?' <span class="pill ok">Studying now</span>':''}${x.pin?' <span class="pill">PIN</span>':''}<div class="muted small">${p.ans} answered · ${pl(p.runs,'quiz or exam','quizzes and exams')} · last activity ${when(p.last)}</div></div><div class="row">${x.id!==ACC.active?`<button class="btn sm primary" data-sw="${x.id}">Switch</button><button class="btn sm" data-rm="${x.id}">Remove</button>`:''}</div><div class="acc-rmbox" data-rmb="${x.id}" hidden></div></div>`}).join('')}</div></section>
+ <section class="card stack"><h2 class="h3">Add a person</h2><div class="field"><label for="acNew">Name</label><div class="row"><input id="acNew" maxlength="24" placeholder="e.g. Luis"><button class="btn primary sm" id="acAdd">Add and switch to them</button></div></div><p class="muted small">The new account starts fresh, with its own setup and diagnostic.</p></section>
+ <section class="card stack"><h2 class="h3">When the app opens</h2><label class="chk"><input type="checkbox" id="acAsk" ${ACC.ask!==false?'checked':''}> Ask "Who's studying?" each time the app opens (when there are two or more accounts)</label>
+  <p class="muted small">Accounts live on this device only. PDFs added in My code books are shared by everyone on this device; highlights and notes are kept per account. To move an account to another phone, open Data &amp; settings while that account is active, use Export, then Import on the other phone.</p></section>`;
+ const nm=v=>v.trim().replace(/\s+/g,' ').slice(0,24);
+ const taken=(v,except)=>ACC.list.some(y=>y.id!==except&&y.name.toLowerCase()===v.toLowerCase());
+ $('#acNmGo').onclick=()=>{const v=nm($('#acNm').value);if(!v){toast('Enter a name');return}if(taken(v,a.id)){toast('That name is already used');return}a.name=v;regSave();accChip();toast('Name saved');vAccount(m)};
+ m.querySelectorAll('[data-col]').forEach(b=>b.onclick=()=>{a.color=b.dataset.col;regSave();accChip();vAccount(m)});
+ if($('#acPinGo'))$('#acPinGo').onclick=()=>{const v=$('#acPin').value.trim();if(!/^\d{4,8}$/.test(v)){toast('Use 4 to 8 digits');return}a.pin=pinHash(v);regSave();toast('PIN set');vAccount(m)};
+ if($('#acPinX'))$('#acPinX').onclick=()=>{delete a.pin;regSave();toast('PIN removed');vAccount(m)};
+ m.querySelectorAll('[data-sw]').forEach(b=>b.onclick=()=>openAcc(b.dataset.sw,'account'));
+ m.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{const x=ACC.list.find(y=>y.id===b.dataset.rm);const box=m.querySelector(`[data-rmb="${x.id}"]`);box.hidden=false;
+  box.innerHTML=`<div class="confirm"><b>Remove ${esc(x.name)} and delete all of their progress on this device?</b> This cannot be undone.<div class="field"><label for="rmT_${x.id}">Type ${esc(x.name)} to confirm</label><input id="rmT_${x.id}" autocomplete="off"></div><div class="row"><button class="btn bad sm" data-rmy="${x.id}">Remove ${esc(x.name)}</button><button class="btn sm" data-rmn>Cancel</button></div></div>`;
+  box.querySelector('[data-rmn]').onclick=()=>{box.hidden=true};
+  box.querySelector('[data-rmy]').onclick=()=>{if(box.querySelector('input').value.trim()!==x.name){toast('Type the name exactly to confirm');return}
+   if(x.pin){askPin(x,()=>doRm(x));return}doRm(x)}});
+ const doRm=x=>{try{localStorage.removeItem(accKey(x.id))}catch(e){}ACC.list=ACC.list.filter(y=>y.id!==x.id);regSave();toast(x.name+' removed');vAccount(m)};
+ $('#acAdd').onclick=()=>{const v=nm($('#acNew').value);if(!v){toast('Enter a name');return}if(taken(v)){toast('That name is already used');return}
+  if(ACC.list.length>=8){toast('Up to 8 accounts per device');return}let n=2;while(ACC.list.some(y=>y.id==='a'+n))n++;
+  const used=ACC.list.map(y=>y.color);ACC.list.push({id:'a'+n,name:v,color:ACOL.find(c=>!used.includes(c))||ACOL[n%ACOL.length],created:Date.now()});ACC.hint=false;regSave();switchAcc('a'+n,'home')};
+ $('#acAsk').onchange=e=>{ACC.ask=e.target.checked;regSave();toast(ACC.ask?'The app will ask who is studying':'The app opens the last account used')}}
 
 /* ---------- boot ---------- */
 const API={get S(){return S},save,toast,esc,head,say,go};
-load();applyTheme();
+regLoad();regSave();load();applyTheme();
 $('#nav').innerHTML=NAV.map(n=>`<a href="#${n[0]}" data-r="${n[0]}">${n[1]}</a>`).join('');
 $('#thBtn').onclick=()=>{S.theme=S.theme==='dark'?'light':S.theme==='light'?'system':'dark';applyTheme();save();toast('Theme: '+(S.theme==='system'?'match system':S.theme))};
+accChip();$('#accBtn').onclick=()=>go('account');
+document.addEventListener('click',e=>{if(e.target.id==='accHintX'){ACC.hint=false;regSave();e.target.closest('.acc-hint').remove()}});
+window.addEventListener('pagehide',()=>{if(saveT)writeNow()});
 route();
+let who=null;try{who=sessionStorage.getItem('g11who')}catch(e){}
+if(ACC.list.length>1&&ACC.ask!==false&&!who)whoPicker();
 })();
