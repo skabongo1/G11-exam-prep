@@ -542,19 +542,21 @@ function newPin(a,ok){const o=document.createElement('div');o.className='acc-ov'
  const go2=()=>{const v=i1.value.trim();if(!/^\d{4,8}$/.test(v))return bad('Use 4 to 8 digits.');if(v!==i2.value.trim())return bad('The two PINs don\'t match.');if(pinHash(v)===a.pin)return bad('Choose a PIN different from the temporary one.');
   a.pin=pinHash(v);delete a.pinTemp;regSave();o.remove();toast('Your new PIN is saved');ok()};
  o.querySelector('#npY').onclick=go2;i2.onkeydown=e=>{if(e.key==='Enter')go2()};o.querySelectorAll('input').forEach(x=>x.addEventListener('keydown',e=>{if(e.key==='Escape')o.remove()}));o.querySelector('#npN').onclick=()=>o.remove()}
+function logOut(){writeNow();try{sessionStorage.removeItem('g11who')}catch(e){}document.querySelectorAll('.acc-ov').forEach(x=>x.remove());go('home');setTimeout(whoPicker,0)}
 function openAcc(id,to){const a=ACC.list.find(x=>x.id===id);if(!a)return;if(id===ACC.active){go(to||'home');return}if(a.pin)askPin(a,()=>switchAcc(id,to));else switchAcc(id,to)}
 function whoPicker(){const o=document.createElement('div');o.className='acc-ov who';
- o.innerHTML=`<div class="card stack acc-who" role="dialog" aria-modal="true" aria-labelledby="whoH"><h2 id="whoH">Who's studying?</h2><p class="muted">Each person has their own plan, scores, notes and flashcards.</p><div class="acc-grid">${ACC.list.map(a=>`<button class="acc-pick" data-who="${a.id}">${accAv(a,1)}<b>${esc(a.name)}</b>${a.pin?`<span class="muted small">${a.pinTemp?'New: temporary PIN':'PIN'}</span>`:''}</button>`).join('')}</div><div class="row"><a class="btn sm" href="#account" id="whoMg">Manage accounts</a></div></div>`;
+ o.innerHTML=`<div class="card stack acc-who" role="dialog" aria-modal="true" aria-labelledby="whoH"><h2 id="whoH">Who's studying?</h2><p class="muted">Each person has their own plan, scores, notes and flashcards.</p><div class="acc-grid">${ACC.list.map(a=>`<button class="acc-pick" data-who="${a.id}">${accAv(a,1)}<b>${esc(a.name)}</b>${a.pin?`<span class="muted small">${a.pinTemp?'New: temporary PIN':'PIN'}</span>`:''}</button>`).join('')}</div>${curAcc().pin?'':'<div class="row"><a class="btn sm" href="#account" id="whoMg">Manage accounts</a></div>'}</div>`;
  document.body.appendChild(o);
  o.querySelectorAll('[data-who]').forEach(b=>b.onclick=()=>{const a=ACC.list.find(x=>x.id===b.dataset.who);
   const done=()=>{o.remove();try{sessionStorage.setItem('g11who',a.id)}catch(e){}if(a.id===ACC.active){toast('Studying as '+a.name);route()}else switchAcc(a.id)};
   if(a.pin)askPin(a,done);else done()});
- o.querySelector('#whoMg').onclick=()=>{o.remove();try{sessionStorage.setItem('g11who',ACC.active)}catch(e){}};
+ if(o.querySelector('#whoMg'))o.querySelector('#whoMg').onclick=()=>{o.remove();try{sessionStorage.setItem('g11who',ACC.active)}catch(e){}};
  o.querySelector('[data-who]').focus()}
 function vAccount(m){const a=curAcc();const when=t=>t?new Date(t).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'none yet';
  const me=peekAcc(a.id);
  m.innerHTML=`${head('Accounts','Everyone who studies on this device gets their own account. Progress never mixes between accounts.')}
  <section class="card stack"><div class="acc-me">${accAv(a,1)}<div><div class="eyebrow">Studying now</div><h2>${esc(a.name)}</h2><p class="muted">${pl(me.ans,'question')} answered · ${pl(me.runs,'quiz or exam','quizzes and exams')} · last activity ${when(me.last)}</p></div></div>
+  <div class="row"><button class="btn sm" id="acOut">Log out</button><span class="muted small">Saves your progress and returns to "Who's studying?" so someone else can sign in.</span></div>
   <div class="field"><label for="acNm">Name</label><div class="row"><input id="acNm" maxlength="24" value="${esc(a.name)}"><button class="btn sm" id="acNmGo">Save name</button></div></div>
   <div class="field"><span class="lbl" id="acColL">Color</span><div class="row" role="radiogroup" aria-labelledby="acColL">${ACOL.map((c,k)=>`<button class="acc-col" role="radio" aria-checked="${a.color===c}" data-col="${c}" style="background:${c}" aria-label="Color ${k+1}"></button>`).join('')}</div></div>
   <div class="field"><span class="lbl">PIN (optional)</span><p class="muted small">A PIN stops someone from opening your account by mistake. It is not a password: anyone using this device and the browser's developer tools could still read the saved data.</p><div class="row">${a.pin?`<button class="btn sm" id="acPinX">Remove PIN</button>`:`<input id="acPin" type="password" inputmode="numeric" maxlength="8" placeholder="4–8 digits" aria-label="New PIN" autocomplete="off"><button class="btn sm" id="acPinGo">Set PIN</button>`}</div></div></section>
@@ -585,6 +587,7 @@ function vAccount(m){const a=curAcc();const when=t=>t?new Date(t).toLocaleDateSt
   box.innerHTML=`<div class="confirm"><b>Give ${esc(x.name)} a temporary PIN</b><p class="muted small">Use this if ${esc(x.name)} forgot their PIN. It replaces their current PIN, and they choose a new one the next time they open their account.</p><div class="field"><label for="tpI_${x.id}">Temporary PIN (4–8 digits)</label><input id="tpI_${x.id}" type="password" inputmode="numeric" maxlength="8" autocomplete="off"></div><div class="row"><button class="btn primary sm" data-tpy>Set temporary PIN</button><button class="btn sm" data-tpn>Cancel</button></div></div>`;
   box.querySelector('[data-tpn]').onclick=()=>{box.hidden=true};
   box.querySelector('[data-tpy]').onclick=()=>{const v=box.querySelector('input').value.trim();if(!/^\d{4,8}$/.test(v)){toast('Use 4 to 8 digits');return}x.pin=pinHash(v);x.pinTemp=true;regSave();toast('Temporary PIN set for '+x.name);vAccount(m)}});
+ $('#acOut').onclick=logOut;
  $('#acAsk').onchange=e=>{ACC.ask=e.target.checked;regSave();toast(ACC.ask?'The app will ask who is studying':'The app opens the last account used')}}
 
 /* ---------- boot ---------- */
