@@ -2377,7 +2377,7 @@ function vPractice(m){if(S.run&&(S.run.kind==='quiz')){if(S.run.done)return resu
  const filters=(withDemo)=>`<div class="card cfg"><div class="field"><label for="fD">Topic</label><select id="fD"><option value="all">All topics</option>${[1,2,3,4].map(d=>`<option value="${d}" ${preD==d?'selected':''}>${DOM[d].name}</option>`).join('')}</select></div>
   <div class="field"><label for="fS">Subtopic</label><select id="fS"><option value="all">All subtopics</option></select></div>
   <div class="field"><label for="fF">Difficulty</label><select id="fF"><option value="all">Any</option><option value="1">Basic</option><option value="2">Intermediate</option><option value="3">Advanced</option></select></div>
-  <div class="field"><label for="fN">Questions</label><select id="fN"><option>10</option><option selected>20</option><option value="999">All matching</option></select></div>
+  <div class="field"><label for="fN">Questions</label><select id="fN"><option>10</option><option selected>20</option><option>30</option><option>45</option><option>90</option><option value="999">All matching</option></select></div>
   ${withDemo?'<label class="chk"><input type="checkbox" id="fDemo"> Include demonstration items</label>':''}<button class="btn primary" id="fGo">Start</button></div>`;
  const pool=(demo)=>G.Q.filter(q=>(demo||q.v)&&($('#fD').value==='all'||q.d==$('#fD').value)&&($('#fS').value==='all'||q.s===$('#fS').value)&&($('#fF').value==='all'||q.df==$('#fF').value));
  const subFill=()=>{const d=$('#fD');const fs=$('#fS');if(!d||!fs)return;const subs=d.value==='all'?G.EXAM.domains.flatMap(x=>x.subs):DOM[d.value].subs;fs.innerHTML='<option value="all">All subtopics</option>'+subs.map(x=>`<option value="${esc(x)}">${esc(x)} (${VER.filter(q=>q.s===x).length})</option>`).join('')};
@@ -2666,7 +2666,7 @@ if(ACC.list.length>1&&ACC.ask!==false&&!who)whoPicker();
 <div id="upd" class="updbar" role="status" hidden><span>A new version of G11 Exam Prep is ready.</span><button class="btn sm" id="updGo">Update now</button></div>
 <style>.updbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:70;display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--paper);color:var(--ink);border:2px solid var(--d3);border-radius:12px;padding:10px 14px;max-width:calc(100% - 32px);box-shadow:0 6px 24px rgba(0,0,0,.25)}</style>
 <script>
-window.G11_APP_VERSION = "2026.11.18-2014";
+window.G11_APP_VERSION = "2026.11.19-1910";
 (function(){
   if(!('serviceWorker' in navigator)) return;
   var bar=document.getElementById('upd'), refreshing=false;
