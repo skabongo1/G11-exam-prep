@@ -5,20 +5,20 @@
 <style>
 /* Layout: plan-room app. Sticky title block + sheet index (nav) on the left; one working sheet at a time. Domain colors are fixed: blue permits, red life safety, amber structural, green envelope. */
 :root{
-  --bg:#f2f5f9;--paper:#fff;--ink:#14203a;--muted:#55627a;--line:#d5dce7;--soft:#e8eef6;
+  --bg:#f7fafe;--paper:#fff;--ink:#0f2747;--muted:#4b5f7c;--line:#d3e0f0;--soft:#eaf2fc;--act:#0a6ed1;--acti:#fff;
   --d1:#1f5fcf;--d1s:#e2ebfc;--d2:#c9321c;--d2s:#fce4df;--d3:#b97900;--d3s:#fbefd2;--d4:#12855f;--d4s:#daf2e8;--pd:#6b4bc9;--pds:#ebe5fb;
   --ok:#12855f;--oks:#daf2e8;--warn:#a86a00;--warns:#fbefd2;--bad:#c9321c;--bads:#fce4df;--focus:#e39a00;
-  --grid:rgba(31,95,207,.06);
+  --grid:rgba(10,110,209,.045);
   --f-d:"Barlow Condensed","Arial Narrow",Arial,sans-serif;--f-b:"Source Sans 3","Segoe UI",system-ui,sans-serif;--f-m:"JetBrains Mono",ui-monospace,Consolas,monospace;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#0d1220;--paper:#151d2d;--ink:#e6ebf4;--muted:#9da8bc;--line:#2a3448;--soft:#1c2537;
   --d1:#7aa5ff;--d1s:#1b2a4f;--d2:#ff8670;--d2s:#43211c;--d3:#ffc94d;--d3s:#3b2e10;--d4:#4fd6a7;--d4s:#12392d;--pd:#b39bff;--pds:#2a2148;
-  --ok:#4fd6a7;--oks:#12392d;--warn:#ffc94d;--warns:#3b2e10;--bad:#ff8670;--bads:#43211c;--focus:#ffc94d;--grid:rgba(122,165,255,.05);color-scheme:dark}}
+  --ok:#4fd6a7;--oks:#12392d;--warn:#ffc94d;--warns:#3b2e10;--bad:#ff8670;--bads:#43211c;--focus:#ffc94d;--grid:rgba(122,165,255,.05);--act:#e6ebf4;--acti:#0d1220;color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0d1220;--paper:#151d2d;--ink:#e6ebf4;--muted:#9da8bc;--line:#2a3448;--soft:#1c2537;
   --d1:#7aa5ff;--d1s:#1b2a4f;--d2:#ff8670;--d2s:#43211c;--d3:#ffc94d;--d3s:#3b2e10;--d4:#4fd6a7;--d4s:#12392d;--pd:#b39bff;--pds:#2a2148;
-  --ok:#4fd6a7;--oks:#12392d;--warn:#ffc94d;--warns:#3b2e10;--bad:#ff8670;--bads:#43211c;--focus:#ffc94d;--grid:rgba(122,165,255,.05);color-scheme:dark}
+  --ok:#4fd6a7;--oks:#12392d;--warn:#ffc94d;--warns:#3b2e10;--bad:#ff8670;--bads:#43211c;--focus:#ffc94d;--grid:rgba(122,165,255,.05);--act:#e6ebf4;--acti:#0d1220;color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-b);font-size:17px;line-height:1.55;
   background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px}
@@ -31,7 +31,7 @@ p{margin:0}
 .skip{position:absolute;left:-999px;top:8px;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:8px;z-index:50}.skip:focus{left:12px}
 /* header */
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--paper)}
-.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--paper);border-bottom:2px solid var(--ink)}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--paper);border-bottom:2px solid var(--act)}
 .top .in{display:flex;align-items:center;gap:12px;justify-content:space-between;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1280px;margin:0 auto}
 .brand{display:flex;align-items:baseline;gap:10px;min-width:0}
 .brand b{font-family:var(--f-d);font-size:1.4rem;font-weight:800;letter-spacing:.02em}
@@ -41,7 +41,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 #nav{position:sticky;top:calc(env(safe-area-inset-top,0px) + 80px);align-self:start;display:flex;flex-direction:column;gap:4px}
 #nav a{display:flex;align-items:center;min-height:44px;padding:8px 12px;border-radius:10px;text-decoration:none;color:var(--ink);font-weight:600}
 #nav a:hover{background:var(--soft)}
-#nav a[aria-current="page"]{background:var(--ink);color:var(--bg)}
+#nav a[aria-current="page"]{background:var(--act);color:var(--acti)}
 @media (max-width:900px){.shell{grid-template-columns:minmax(0,1fr);gap:12px;padding-top:10px}#nav{position:static;flex-direction:row;overflow-x:auto;gap:6px;padding-bottom:6px}#nav a{white-space:nowrap;border:1.5px solid var(--line);background:var(--paper)}}
 #main{min-width:0;display:grid;gap:18px;align-content:start}#main>*{min-width:0}
 #main:focus{outline:none}
@@ -58,9 +58,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .vh{display:flex;flex-wrap:wrap;gap:10px 18px;justify-content:space-between;align-items:flex-end}
 .sub,.muted{color:var(--muted)}.fine{font-size:.85rem;color:var(--muted)}
 .eyebrow{font-family:var(--f-m);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:8px 16px;border-radius:10px;border:2px solid var(--ink);background:var(--paper);color:var(--ink);font:600 1rem var(--f-b);cursor:pointer;text-decoration:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:8px 16px;border-radius:10px;border:2px solid var(--act);background:var(--paper);color:var(--act);font:600 1rem var(--f-b);cursor:pointer;text-decoration:none}
 .btn:hover{background:var(--soft)}.btn[disabled]{opacity:.45;cursor:not-allowed}
-.btn.primary{background:var(--ink);color:var(--bg)}.btn.primary:hover{opacity:.92}
+.btn.primary{background:var(--act);color:var(--acti)}.btn.primary:hover{opacity:.92}
 .btn.big{min-height:52px;font-size:1.05rem;padding:10px 20px}
 .btn.sm{min-height:38px;padding:4px 12px;font-size:.92rem}
 .btn.bad{border-color:var(--bad);color:var(--bad)}
@@ -251,6 +251,14 @@ ol.rules{margin:0;padding-left:22px;display:grid;gap:8px}ol.rules .ref{color:var
 .fx-flash{animation:fxflash .6s ease}@keyframes fxflash{50%{box-shadow:0 0 0 4px var(--bad)}}
 .fx-reveal{animation:fxrev 1.2s ease .3s}@keyframes fxrev{50%{box-shadow:0 0 0 4px var(--ok)}}
 @media (prefers-reduced-motion:reduce){.fx-pop,.fx-shake,.fx-reveal{animation:none}}
+/* day/night switch */
+.tgl{position:relative;flex:none;width:66px;height:36px;border-radius:999px;border:2px solid var(--act);background:var(--soft);cursor:pointer;padding:0}
+.tgl svg{position:absolute;top:50%;width:18px;height:18px;transform:translateY(-50%);fill:var(--act);stroke:var(--act);opacity:.55}
+.tgl .tgl-sun{left:8px}.tgl .tgl-moon{right:8px;stroke:none}
+.tgl .k{position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:var(--act);box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .2s ease}
+.tgl[aria-checked=true] .k{transform:translateX(30px)}
+.tgl[aria-checked=false] .tgl-sun{opacity:0}.tgl[aria-checked=true] .tgl-moon{opacity:0}
+@media (prefers-reduced-motion:reduce){.tgl .k{transition:none}}
 /* accounts */
 .acc-top{gap:8px;flex-wrap:nowrap}.acc-btn{display:inline-flex;align-items:center;gap:8px;max-width:46vw}.acc-nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .acc-av{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;color:#fff;font-weight:800;font-size:.85rem;flex:none}
@@ -268,7 +276,7 @@ ol.rules{margin:0;padding-left:22px;display:grid;gap:8px}ol.rules .ref{color:var
 @media (max-width:560px){.acc-row{grid-template-columns:auto minmax(0,1fr)}.acc-row>.row{grid-column:1/-1}.acc-nm{max-width:28vw}}
 </style>
 <a class="skip" href="#main">Skip to content</a>
-<header class="top"><div class="in"><div class="brand"><b>G11 Exam Prep</b><span>Independent study app · not affiliated with ICC</span></div><div class="row acc-top"><button class="btn sm acc-btn" id="accBtn" aria-label="Accounts"></button><button class="btn sm" id="thBtn" aria-label="Change color theme">◐ Theme</button></div></div><div class="stripe" aria-hidden="true"></div></header>
+<header class="top"><div class="in"><div class="brand"><b>G11 Exam Prep</b><span>Independent study app · not affiliated with ICC</span></div><div class="row acc-top"><button class="btn sm acc-btn" id="accBtn" aria-label="Accounts"></button><button class="tgl" id="thBtn" role="switch" aria-checked="false" aria-label="Dark mode" title="Day or night"><svg class="tgl-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><g stroke-width="2" stroke-linecap="round"><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></g></svg><svg class="tgl-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><span class="k" aria-hidden="true"></span></button></div></div><div class="stripe" aria-hidden="true"></div></header>
 <div class="shell"><nav id="nav" aria-label="Main"></nav><main id="main" tabindex="-1"></main></div>
 <div class="shell" style="padding-block:0 30px"><span></span><p class="disclaim">Independent exam preparation. Not affiliated with, endorsed by or sponsored by the International Code Council. Practice questions are original and are not actual ICC exam questions. Code references point to the 2018 International Building Code, first printing; code text is not reproduced.</p></div>
 <div id="toast" role="status" hidden></div><div id="live" class="sr" aria-live="polite"></div>

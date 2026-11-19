@@ -53,7 +53,8 @@ function save(){clearTimeout(saveT);saveT=setTimeout(writeNow,120)}
 function log(kind,label,score){S.log.unshift({at:Date.now(),kind,label,score});S.log=S.log.slice(0,40);save()}
 
 /* ---------------- theme ---------------- */
-function applyTheme(){const r=document.documentElement;if(S.theme==='light'||S.theme==='dark')r.setAttribute('data-theme',S.theme);else r.removeAttribute('data-theme')}
+const isDark=()=>S.theme==='dark'||(S.theme!=='light'&&!!(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches));
+function applyTheme(){const r=document.documentElement;if(S.theme==='light'||S.theme==='dark')r.setAttribute('data-theme',S.theme);else r.removeAttribute('data-theme');const b=document.getElementById('thBtn');if(b){const d=isDark();b.setAttribute('aria-checked',String(d));b.title=d?'Night mode on: switch to day':'Day mode on: switch to night'}}
 
 /* ---------------- toast / live ---------------- */
 function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(t._t);t._t=setTimeout(()=>t.hidden=true,3500)}
@@ -614,7 +615,7 @@ function vAccount(m){const a=curAcc();const when=t=>t?new Date(t).toLocaleDateSt
 const API={get S(){return S},save,toast,esc,head,say,go};
 regLoad();regSave();load();applyTheme();
 $('#nav').innerHTML=NAV.map(n=>`<a href="#${n[0]}" data-r="${n[0]}">${n[1]}</a>`).join('');
-$('#thBtn').onclick=()=>{S.theme=S.theme==='dark'?'light':S.theme==='light'?'system':'dark';applyTheme();save();toast('Theme: '+(S.theme==='system'?'match system':S.theme))};
+$('#thBtn').onclick=()=>{S.theme=isDark()?'light':'dark';applyTheme();save()};applyTheme();
 accChip();$('#accBtn').onclick=()=>go('account');
 document.addEventListener('click',e=>{if(e.target.id==='accHintX'){ACC.hint=false;regSave();e.target.closest('.acc-hint').remove()}});
 window.addEventListener('pagehide',()=>{if(saveT)writeNow()});
