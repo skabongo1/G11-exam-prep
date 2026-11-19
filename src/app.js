@@ -21,6 +21,13 @@ const fmtT=s=>{s=Math.max(0,Math.round(s));const h=Math.floor(s/3600),m=Math.flo
 const today=()=>{const d=new Date();return Math.floor((d.getTime()-d.getTimezoneOffset()*60000)/86400000)};
 const dayStr=n=>new Date(n*86400000).toLocaleDateString(undefined,{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'});
 const dayFromISO=s=>{if(!s)return null;const t=Date.parse(s+'T00:00:00Z');return isNaN(t)?null:Math.floor(t/86400000)};
+const isoOf=n=>new Date(n*86400000).toISOString().slice(0,10);
+const nextMonday=()=>{const t=today();const wd=new Date(t*86400000).getUTCDay();return t+((8-wd)%7||7)};
+/* Plan window: start date (never before today) to start + N weeks, or to the exam date. */
+function planWindow(P){const t=today();const st=Math.max(t,dayFromISO(P.startDate)||t);const ex=dayFromISO(P.examDate);
+ let end,by=P.planBy||'weeks';if(by==='exam'&&ex&&ex>st+3)end=ex;else{by='weeks';end=st+7*Math.max(1,Math.min(52,+P.planWeeks||8))}
+ const days=(P.days&&P.days.length?P.days:[1,2,3,4,5]);let n=0,first=null,last=null;for(let d=st;d<end;d++)if(days.includes(new Date(d*86400000).getUTCDay())){n++;if(first==null)first=d;last=d}
+ return {st,end,by,n,first:first??st,last:last??st,mpd:Math.max(30,Math.round((+P.hours||10)*60/days.length))}}
 
 /* ---------------- state ---------------- */
 const KEY='g11prep.v1';
@@ -79,8 +86,8 @@ function grade(id,g){const t=today();const st=S.cards[id]||{box:0,due:t,n:0};
 
 /* ---------------- study plan ---------------- */
 const MOD_SCN={A:['S3','S4'],B:['S1','S2','S5']};
-function genPlan(){const P=S.profile,t=today();let end=dayFromISO(P.examDate);if(!end||end<=t+3)end=t+56;
- const days=(P.days&&P.days.length?P.days:[1,2,3,4,5]);const mpd=Math.max(30,Math.round((+P.hours||10)*60/days.length));
+function genPlan(){const P=S.profile;const W=planWindow(P);const t=W.st,end=W.end;
+ const days=(P.days&&P.days.length?P.days:[1,2,3,4,5]);const mpd=W.mpd;
  const weak={};[1,2,3,4].forEach(d=>{const v=S.diag&&S.diag.dom[d];weak[d]=v&&v[1]?1-v[0]/v[1]:0.5});
  const modOrder=(weak[2]>weak[1]?['B','A']:['A','B']).concat(G.MODULES.map(x=>x.id).filter(x=>x!=='A'&&x!=='B'));
  const queue=[];modOrder.forEach(m=>{G.LESSONS.filter(l=>l.mod===m).forEach(l=>{if(!(S.lessons[l.id]&&S.lessons[l.id].done))queue.push({type:'lesson',ref:l.id,label:'Lesson '+l.id+': '+l.title,mins:l.mins})});
@@ -96,7 +103,7 @@ function genPlan(){const P=S.profile,t=today();let end=dayFromISO(P.examDate);if
   while(left>=20){const dd=prSeq[prI++%prSeq.length];tasks.push({type:'practice',ref:String(dd),label:'Practice: '+DOM[dd].name+' (10 questions)',mins:20});left-=20}
   if(wd===days[0]&&daysLeft>14&&out.length>3){tasks.push({type:'quiz',label:'Timed quiz (20 questions)',mins:53})}
   out.push({day:d,tasks:tasks.map((x,i)=>Object.assign({id:d+'_'+i,done:false},x))})}
- S.plan={at:Date.now(),end,mpd,days:out};save()}
+ S.plan={at:Date.now(),start:t,end,mpd,days:out};save()}
 function todayPlan(){if(!S.plan)return null;const t=today();return S.plan.days.find(x=>x.day===t)||null}
 function nextPlanDay(){if(!S.plan)return null;const t=today();return S.plan.days.find(x=>x.day>=t&&x.tasks.some(k=>!k.done))||null}
 function autoDone(type,ref){const d=todayPlan()||nextPlanDay();if(!d)return;const k=d.tasks.find(x=>!x.done&&x.type===type&&(ref==null||x.ref==null||x.ref===String(ref)));if(k){k.done=true;save()}}
@@ -169,11 +176,23 @@ function vHome(m){const st=stats(),rd=readiness(st),P=S.profile;const tp=todayPl
  $('#cont').addEventListener('click',()=>{if(next)goTask(next);else{const l=G.LESSONS.find(l=>!(S.lessons[l.id]&&S.lessons[l.id].done));go(l?'lesson-'+l.id:'practice')}})}
 
 /* ---------- Onboarding ---------- */
+function planFields(P,x){const st=P.startDate||isoOf(today());const by=P.planBy||'weeks';
+ return `<div class="grid2"><div class="field"><label for="${x}St">Start date</label><div class="row"><input id="${x}St" type="date" value="${esc(st)}" min="${isoOf(today())}"><button class="btn sm" type="button" id="${x}Mon">Next Monday</button></div><small>The plan's first study day. Nothing is scheduled before it.</small></div>
+ <div class="field"><label for="${x}Date">Exam date</label><input id="${x}Date" type="date" value="${esc(P.examDate)}"><small>Optional. Shown on the dashboard as a countdown.</small></div></div>
+ <fieldset class="plen"><legend>Plan length</legend><label class="chk"><input type="radio" name="${x}By" value="weeks" ${by!=='exam'?'checked':''}> <input id="${x}Wk" type="number" min="1" max="52" step="1" value="${+P.planWeeks||8}" aria-label="Number of weeks" style="width:5.5em"> weeks, at my own pace</label><label class="chk"><input type="radio" name="${x}By" value="exam" ${by==='exam'?'checked':''}> Until my exam date</label></fieldset>
+ <p class="callout" id="${x}Pv" role="status"></p>`}
+function readPlanFields(m,x){return {startDate:$('#'+x+'St').value||isoOf(today()),examDate:$('#'+x+'Date').value,planBy:(m.querySelector(`input[name="${x}By"]:checked`)||{}).value||'weeks',planWeeks:Math.max(1,Math.min(52,Math.round(+$('#'+x+'Wk').value||8)))}}
+function bindPlanFields(m,x,hrsId){const pv=()=>{const days=[...m.querySelectorAll('.days input:checked')].map(z=>+z.value);const P=Object.assign({},S.profile,readPlanFields(m,x),{days,hours:+$('#'+hrsId).value||10});
+  const ex=dayFromISO(P.examDate);const W=planWindow(P);const warn=P.planBy==='exam'&&!(ex&&ex>W.st+3)?' No exam date after the start date, so the plan uses the number of weeks. ':'';
+  const exWarn=ex&&W.by==='weeks'&&W.end>ex?` Note: this ends after your exam date (${dayStr(ex)}).`:'';
+  $('#'+x+'Pv').innerHTML=`<b>${dayStr(W.first)} → ${dayStr(W.last)}</b> · ${Math.round((W.end-W.st)/7*10)/10} weeks · ${W.n} study days · about ${W.mpd} min per study day (${Math.round(W.n*W.mpd/60)} hours in all).${warn}${exWarn}`};
+ m.querySelectorAll(`#${x}St,#${x}Date,#${x}Wk,#${hrsId},.days input,input[name="${x}By"]`).forEach(e=>{e.addEventListener('input',pv);e.addEventListener('change',pv)});
+ $('#'+x+'Wk').addEventListener('focus',()=>{const r=m.querySelector(`input[name="${x}By"][value="weeks"]`);r.checked=true;pv()});
+ $('#'+x+'Mon').onclick=()=>{$('#'+x+'St').value=isoOf(nextMonday());pv()};pv()}
 function vStart(m){const P=S.profile;const D=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
  m.innerHTML=`${head('Set up your plan','About two minutes. You can change any of this later.')}
  <form class="card stack" id="ob" novalidate>
   <div class="grid2">
-   <div class="field"><label for="obDate">Exam date</label><input id="obDate" type="date" value="${esc(P.examDate)}"><small>Leave blank if not booked; the plan assumes 8 weeks.</small></div>
    <div class="field"><label for="obJur">Jurisdiction where you'll be licensed</label><select id="obJur">${['','Pikes Peak Regional (Colorado Springs)','Larimer County','Jefferson County / Aurora','Denver','Wheat Ridge','Other Colorado jurisdiction','Outside Colorado'].map(j=>`<option ${P.jur===j?'selected':''} value="${esc(j)}">${j||'Choose…'}</option>`).join('')}</select><small id="obJurNote"></small></div>
    <div class="field"><label for="obIbc">Building code book you have</label><select id="obIbc">${[['2018','2018 IBC (approved for G11)'],['2015','2015 IBC'],['2021','2021 IBC'],['2024','2024 IBC'],['none','Not yet']].map(o=>`<option value="${o[0]}" ${P.ibc===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select><small id="obIbcNote"></small></div>
    <div class="field"><label for="obCm">Concrete Manual edition</label><select id="obCm">${[['','Choose…'],['2021','Based on 2021 IBC & ACI 318-19 (approved)'],['2015','Based on 2015 IBC & ACI 318-14 (approved)'],['2012','Based on 2012 IBC & ACI 318-11'],['none','Not yet']].map(o=>`<option value="${o[0]}" ${P.cm===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select><small id="obCmNote"></small></div>
@@ -181,16 +200,17 @@ function vStart(m){const P=S.profile;const D=['Sun','Mon','Tue','Wed','Thu','Fri
    <div class="field"><label for="obHrs">Study hours per week</label><input id="obHrs" type="number" min="2" max="40" step="1" value="${+P.hours||10}"></div>
   </div>
   <fieldset class="days"><legend>Study days</legend>${D.map((d,i)=>`<label class="chk"><input type="checkbox" value="${i}" ${P.days.includes(i)?'checked':''}> ${d}</label>`).join('')}</fieldset>
+  <h2 class="h3">When and how long</h2>${planFields(P,'ob')}
   <p class="err" id="obErr" hidden></p>
   <div class="row"><button class="btn primary big" type="submit">Save and take the diagnostic</button><button class="btn" type="button" id="obSkip">Save and skip the diagnostic</button></div>
  </form>`;
  const notes=()=>{const j=$('#obJur').value;$('#obJurNote').textContent=j==='Denver'?'ICC\'s Denver bulletin lists F11 (2015 IBC), not G11. Confirm with Denver before you study.':j==='Wheat Ridge'?'Wheat Ridge asks for a 2021 or 2024 Class A test. Call to confirm G11 is accepted.':j?'Confirm with the jurisdiction that it accepts G11.':'';
   const b=$('#obIbc').value;$('#obIbcNote').textContent=b==='2018'?'':'G11 uses the 2018 IBC. Page references in this course match the 2018 first printing.';
   const c=$('#obCm').value;$('#obCmNote').textContent=c==='2012'?'Not on ICC\'s approved list for G11.':''};
- ['obJur','obIbc','obCm'].forEach(i=>$('#'+i).addEventListener('change',notes));notes();
+ ['obJur','obIbc','obCm'].forEach(i=>$('#'+i).addEventListener('change',notes));notes();bindPlanFields(m,'ob','obHrs');
  const commit=()=>{const days=[...m.querySelectorAll('.days input:checked')].map(x=>+x.value);const hrs=+$('#obHrs').value;
   if(!days.length||!(hrs>=2)){const e=$('#obErr');e.hidden=false;e.textContent=!days.length?'Pick at least one study day.':'Enter at least 2 hours per week.';return false}
-  Object.assign(S.profile,{examDate:$('#obDate').value,jur:$('#obJur').value,ibc:$('#obIbc').value,cm:$('#obCm').value,level:$('#obLvl').value,hours:hrs,days,onboarded:true});save();return true};
+  Object.assign(S.profile,readPlanFields(m,'ob'),{jur:$('#obJur').value,ibc:$('#obIbc').value,cm:$('#obCm').value,level:$('#obLvl').value,hours:hrs,days,onboarded:true});save();return true};
  $('#ob').addEventListener('submit',e=>{e.preventDefault();if(commit())go('diagnostic')});
  $('#obSkip').addEventListener('click',()=>{if(commit()){genPlan();toast('Plan created');go('plan')}})}
 
@@ -256,8 +276,8 @@ function vPlan(m){const P=S.profile;const D=['Sun','Mon','Tue','Wed','Thu','Fri'
  if(!S.plan){m.innerHTML=`${head('Study plan')}<div class="card stack"><p>No plan yet.</p><div class="row"><a class="btn primary" href="#start">Set up</a><button class="btn" id="pg">Create a plan with default settings</button></div></div>`;$('#pg').onclick=()=>{genPlan();vPlan(m)};return}
  const t=today();const up=S.plan.days.filter(d=>d.day>=t);let showAll=m._all;const list=showAll?up:up.slice(0,14);
  const done=S.plan.days.reduce((a,d)=>a+d.tasks.filter(k=>k.done).length,0),all=S.plan.days.reduce((a,d)=>a+d.tasks.length,0);
- m.innerHTML=`${head('Study plan',`${up.length} study days to ${dayStr(S.plan.end)} · about ${S.plan.mpd} min per study day · ${done}/${all} tasks done`)}
- <details class="card"><summary><b>Adjust plan</b></summary><div class="stack" style="margin-top:12px"><div class="grid2"><div class="field"><label for="apDate">Exam date</label><input id="apDate" type="date" value="${esc(P.examDate)}"></div><div class="field"><label for="apHrs">Hours per week</label><input id="apHrs" type="number" min="2" max="40" value="${P.hours}"></div></div>
+ m.innerHTML=`${head('Study plan',`${S.plan.days.length&&S.plan.days[0].day>t?'Starts '+dayStr(S.plan.days[0].day)+' · ':''}${up.length} study days to ${S.plan.days.length?dayStr(S.plan.days[S.plan.days.length-1].day):dayStr(S.plan.end-1)} · about ${S.plan.mpd} min per study day · ${done}/${all} tasks done`)}
+ ${!P.startDate?'<div class="callout"><b>New:</b> choose your own start date and plan length (for example 8 or 9 weeks), then tap <b>Regenerate plan</b>. Each account sets its own.</div>':''}<details class="card" ${!P.startDate?'open':''}><summary><b>Adjust plan: start date, length, hours</b></summary><div class="stack" style="margin-top:12px">${planFields(P,'ap')}<div class="grid2"><div class="field"><label for="apHrs">Hours per week</label><input id="apHrs" type="number" min="2" max="40" value="${P.hours}"></div></div>
  <fieldset class="days"><legend>Study days</legend>${D.map((d,i)=>`<label class="chk"><input type="checkbox" value="${i}" ${P.days.includes(i)?'checked':''}> ${d}</label>`).join('')}</fieldset>
  <p class="fine">Regenerating keeps completed lessons and rebuilds future days from your latest results.</p><div class="row"><button class="btn primary" id="apGo">Regenerate plan</button></div></div></details>
  <div class="callout"><b>How the plan is built:</b> lessons first in your weaker module, scenarios after each module, daily flashcards and lookup drills, then practice weighted by exam weight and your diagnostic results; mock exams in the last two weeks. Only Modules A and B exist so far, so later days lean on practice questions for the other topics.</div>
@@ -267,7 +287,7 @@ function vPlan(m){const P=S.profile;const D=['Sun','Mon','Tue','Wed','Thu','Fri'
  m.querySelectorAll('[data-tk]').forEach(c=>c.onchange=()=>{find(c.dataset.day,c.dataset.tk).done=c.checked;save();c.closest('li').classList.toggle('done',c.checked)});
  m.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>goTask(find(b.dataset.day,b.dataset.go)));
  const pa=$('#pAll');if(pa)pa.onclick=()=>{m._all=true;vPlan(m)};
- $('#apGo').onclick=()=>{const days=[...m.querySelectorAll('.days input:checked')].map(x=>+x.value);if(!days.length){toast('Pick at least one study day');return}Object.assign(P,{examDate:$('#apDate').value,hours:Math.max(2,+$('#apHrs').value||10),days});genPlan();toast('Plan regenerated');vPlan(m)}}
+ $('#apGo').onclick=()=>{const days=[...m.querySelectorAll('.days input:checked')].map(x=>+x.value);if(!days.length){toast('Pick at least one study day');return}Object.assign(P,readPlanFields(m,'ap'),{hours:Math.max(2,+$('#apHrs').value||10),days});genPlan();toast('Plan regenerated');vPlan(m)};bindPlanFields(m,'ap','apHrs')}
 
 /* ---------- Course ---------- */
 function vLearn(m){m.innerHTML=`${head('Course','Lessons follow the official outline. Rule sheets cover every subtopic from the verified question bank.')}
