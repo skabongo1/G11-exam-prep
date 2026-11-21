@@ -97,6 +97,7 @@ function genPlan(){const P=S.profile;const W=planWindow(P);const t=W.st,end=W.en
  const out=[];let wk=0;
  for(let d=t;d<end;d++){const wd=new Date(d*86400000).getUTCDay();if(!days.includes(wd))continue;let left=mpd;const tasks=[];
   tasks.push({type:'cards',label:'Flashcard review',mins:10});left-=10;
+  if(left>=35){tasks.push({type:'mastery',label:'Lookup mastery: next tier (10 items)',mins:15});left-=15}
   const daysLeft=end-d;
   if(daysLeft<=14&&wd===days[days.length-1]){tasks.push({type:'exam',ref:'40',label:'Mock exam (40 questions, timed)',mins:107});left-=107}
   while(left>=20&&queue.length){const q=queue[0];if(q.mins>left&&tasks.length>1)break;queue.shift();tasks.push(q);left-=q.mins}
@@ -108,7 +109,7 @@ function genPlan(){const P=S.profile;const W=planWindow(P);const t=W.st,end=W.en
 function todayPlan(){if(!S.plan)return null;const t=today();return S.plan.days.find(x=>x.day===t)||null}
 function nextPlanDay(){if(!S.plan)return null;const t=today();return S.plan.days.find(x=>x.day>=t&&x.tasks.some(k=>!k.done))||null}
 function autoDone(type,ref){const d=todayPlan()||nextPlanDay();if(!d)return;const k=d.tasks.find(x=>!x.done&&x.type===type&&(ref==null||x.ref==null||x.ref===String(ref)));if(k){k.done=true;save()}}
-function taskHref(k){return k.type==='lesson'?'#lesson-'+k.ref:k.type==='scn'?'#scn-'+k.ref:k.type==='practice'?'#practice':k.type==='quiz'?'#practice':k.type==='exam'?'#exam':k.type==='cards'?'#cards':'#lookup'}
+function taskHref(k){return k.type==='lesson'?'#lesson-'+k.ref:k.type==='scn'?'#scn-'+k.ref:k.type==='practice'?'#practice':k.type==='quiz'?'#practice':k.type==='exam'?'#exam':k.type==='cards'?'#cards':k.type==='mastery'?'#mastery':'#lookup'}
 function goTask(k){S.pend={type:k.type,ref:k.ref||null};save();location.hash=taskHref(k).slice(1);route()}
 
 /* ---------------- question card ---------------- */
@@ -133,12 +134,12 @@ document.addEventListener('click',e=>{const oq=e.target.closest('[data-openq]');
  const ns=e.target.closest('[data-ns]');if(ns){const k=ns.dataset.ns;const v=ns.closest('.notebox').querySelector('textarea').value.trim();if(v)S.notes[k]=v;else delete S.notes[k];save();toast('Note saved');ns.closest('.notebox').hidden=true}});
 
 /* ---------------- routing ---------------- */
-const NAV=[['home','Dashboard'],['plan','Study plan'],['learn','Course'],['practice','Practice'],['scenarios','Scenarios'],['lookup','Lookup trainer'],['reader','My code books'],['guides','Book guides'],['exam','Practice exams'],['cards','Flashcards'],['info','Exam info'],['account','Accounts'],['data','Data & settings']];
+const NAV=[['home','Dashboard'],['plan','Study plan'],['learn','Course'],['practice','Practice'],['scenarios','Scenarios'],['lookup','Lookup trainer'],['mastery','Lookup mastery'],['reader','My code books'],['guides','Book guides'],['exam','Practice exams'],['cards','Flashcards'],['info','Exam info'],['account','Accounts'],['data','Data & settings']];
 let timer=null;
 function route(){clearInterval(timer);timer=null;const h=(location.hash||'#home').slice(1)||'home';const main=$('#main');
  const base=h.split('-')[0];$$('#nav a').forEach(a=>a.setAttribute('aria-current',a.dataset.r===base||(base==='lesson'&&a.dataset.r==='learn')||(base==='scn'&&a.dataset.r==='scenarios')||(base==='diagnostic'&&a.dataset.r==='home')||(base==='start'&&a.dataset.r==='home')||(base==='local'&&a.dataset.r==='info')||(base==='rules'&&a.dataset.r==='learn')?'page':'false'));
- const V={home:vHome,start:vStart,diagnostic:vDiag,plan:vPlan,learn:vLearn,practice:vPractice,scenarios:vScenarios,lookup:vLookup,exam:vExam,cards:vCards,info:vInfo,local:vLocal,data:vData,account:vAccount,reader:m=>G.READER.view(m,API),guides:m=>G.GUIDES.view(m,API),rules:vRules};
- if(h.startsWith('lesson-')&&LBY[h.slice(7)])vLesson(main,h.slice(7));else if(h.startsWith('scn-')&&SBY[h.slice(4)])vScn(main,h.slice(4));else (V[h]||vHome)(main);
+ const V={home:vHome,start:vStart,diagnostic:vDiag,plan:vPlan,learn:vLearn,practice:vPractice,scenarios:vScenarios,lookup:vLookup,exam:vExam,cards:vCards,info:vInfo,local:vLocal,data:vData,account:vAccount,mastery:vMastery,reader:m=>G.READER.view(m,API),guides:m=>G.GUIDES.view(m,API),rules:vRules};
+ if(h.startsWith('lesson-')&&LBY[h.slice(7)])vLesson(main,h.slice(7));else if(h.startsWith('scn-')&&SBY[h.slice(4)])vScn(main,h.slice(4));else if(h.startsWith('mastery-'))vMastery(main);else (V[h]||vHome)(main);
  main.focus({preventScroll:true});window.scrollTo(0,0)}
 window.addEventListener('hashchange',route);
 function go(r){if(location.hash==='#'+r)route();else location.hash=r}
@@ -154,6 +155,8 @@ function vHome(m){const st=stats(),rd=readiness(st),P=S.profile;const tp=todayPl
  const weakSubs=Object.entries(st.sub).filter(([k,v])=>v[1]>=2).map(([k,v])=>({k,p:v[0]/v[1],n:v[1]})).sort((a,b)=>a.p-b.p).slice(0,4);
  m.innerHTML=`${ACC.hint&&ACC.list.length<2?`<section class="card acc-hint"><div><b>Sharing this app with someone?</b><p class="muted">Give each person an account so each of you keeps your own plan, scores and flashcards on this device.</p></div><div class="row"><a class="btn primary sm" href="#account">Set up accounts</a><button class="btn sm" id="accHintX">Not now</button></div></section>`:''}${!P.onboarded?`<section class="hero card"><h2>Set up your study plan</h2><p>Tell me your exam date, jurisdiction, books and study time. A 12-question diagnostic then shapes a daily plan around the official exam weights.</p><div class="row"><a class="btn primary big" href="#start">Start setup</a><a class="btn" href="#learn">Browse the course first</a></div></section>`:''}
  ${head('Dashboard',P.onboarded?`${esc(P.jur||'Jurisdiction not set')} · ${dl!=null?(dl>=0?dl+' days to exam':'Exam date passed'):'No exam date'} · ${P.hours} h/week`:'Independent G11 exam preparation')}
+ ${(()=>{const ib=Object.keys(MX_CH.IBC).map(Number),cm=Object.keys(MX_CH.CM).map(Number);const mi=ib.filter(c=>mxStatus('IBC',c).mastered).length,mc=cm.filter(c=>mxStatus('CM',c).mastered).length;const M=mxS();const f=LK.filter(x=>(M.lk[LKID(x)]||{}).ok>0).length;
+ return `<section class="card mx-next"><div><div class="eyebrow">Lookup mastery</div><h2 class="h3">${mi}/${ib.length} IBC and ${mc}/${cm.length} Concrete Manual chapters mastered</h2><p class="muted small">${f} of ${LK.length} IBC sections and tables found so far. Target: 90 seconds or less per lookup.</p></div><a class="btn primary" href="#mastery">Climb the ladder</a></section>`})()}
  <section class="grid2">
   <div class="card stack"><h2>Today</h2>${tasks?`<p class="muted">${tp?'Today, '+dayStr(tp.day):'Next study day: '+dayStr(np.day)}</p><ul class="tasks">${tasks.tasks.map(k=>`<li class="${k.done?'done':''}"><input type="checkbox" id="tk_${k.id}" data-tk="${k.id}" ${k.done?'checked':''}><label for="tk_${k.id}">${esc(k.label)} <span class="muted">· ${k.mins} min</span></label><button class="mini" data-go="${k.id}">Open</button></li>`).join('')}</ul>`:`<p class="muted">No plan yet. Set up your plan to get daily tasks.</p>`}
    <button class="btn primary big" id="cont">Continue studying${next?': '+esc(next.label):''}</button></div>
@@ -246,7 +249,7 @@ function finishRun(m,backHref){const R=S.run;if(!R||R.done)return;clearInterval(
  if(R.kind==='diag'){S.diag={at:now,dom};}
  if(R.kind==='toon'&&R.ep){S.toon=S.toon||{};const t=S.toon[R.ep]||{};t.best=Math.max(t.best||0,R.res.p);t.runs=(t.runs||0)+1;S.toon[R.ep]=t}
  S.runs.unshift({at:now,kind:R.kind,label:R.label,ser:R.ser||null,c,n:R.qids.length,p:R.res.p,secs,dom});S.runs=S.runs.slice(0,30);
- log(R.kind,R.label,R.res.p);if(R.kind==='exam')autoDone('exam');if(R.kind==='quiz')autoDone('quiz');save();resultView(m,backHref,'all')}
+ log(R.kind,R.label,R.res.p);if(R.kind==='exam')autoDone('exam');if(R.kind==='quiz')autoDone('quiz');if(R.kind==='tier'&&R.tier)mxTierDone(R);save();resultView(m,backHref,'all');mxMsg(m)}
 function followUp(dom){const weak=Object.entries(dom).filter(([d,v])=>v[1]).map(([d,v])=>({d:+d,p:v[0]/v[1]})).sort((a,b)=>a.p-b.p).slice(0,2);
  return weak.map(w=>{const ls=G.LESSONS.filter(l=>G.MODULES.find(x=>x.id===l.mod).d===w.d);const sc=G.SCENARIOS.filter(s=>s.d===w.d);const lk=G.LOOKUPS.filter(l=>l.d===w.d).slice(0,3);
   return {d:w.d,p:w.p,ls,sc,lk}})}
@@ -610,6 +613,111 @@ function vAccount(m){const a=curAcc();const when=t=>t?new Date(t).toLocaleDateSt
   box.querySelector('[data-tpy]').onclick=()=>{const v=box.querySelector('input').value.trim();if(!/^\d{4,8}$/.test(v)){toast('Use 4 to 8 digits');return}x.pin=pinHash(v);x.pinTemp=true;regSave();toast('Temporary PIN set for '+x.name);vAccount(m)}});
  $('#acOut').onclick=logOut;
  $('#acAsk').onchange=e=>{ACC.ask=e.target.checked;regSave();toast(ACC.ask?'The app will ask who is studying':'The app opens the last account used')}}
+
+/* ---------- Lookup mastery ladder ---------- */
+const LK=(G.LK||[]).map(r=>({n:r[0],t:r[1],p:r[2],c:r[3],key:!!r[4],tab:!!r[5]}));
+const LKID=x=>(x.tab?'T':'S')+x.n;
+const LKTITLE={};LK.forEach(x=>{if(!x.tab)LKTITLE[x.n]=x.t});
+const MX_SEC=90;
+const MX_TIERS={1:{name:'Locate',goal:'Find the section or table number in your book',pass:90,size:10},2:{name:'Read',goal:'Pull the exact rule, number or table value',pass:90,size:10},3:{name:'Conditions',goal:'Catch the exception or condition that changes the answer',pass:85,size:10},4:{name:'Speed mix',goal:'Mixed questions from the chapter, 90 seconds each',pass:90,size:15}};
+const MX_CH={IBC:{1:'Scope and Administration',2:'Definitions',3:'Occupancy Classification and Use',4:'Special Detailed Requirements Based on Occupancy and Use',5:'General Building Heights and Areas',6:'Types of Construction',7:'Fire and Smoke Protection Features',8:'Interior Finishes',9:'Fire Protection and Life Safety Systems',10:'Means of Egress',11:'Accessibility',12:'Interior Environment',14:'Exterior Walls',15:'Roof Assemblies and Rooftop Structures',16:'Structural Design',17:'Special Inspections and Tests',18:'Soils and Foundations',19:'Concrete',21:'Masonry',22:'Steel',23:'Wood',24:'Glass and Glazing',25:'Gypsum Board, Gypsum Panel Products and Plaster',26:'Plastic',29:'Plumbing Systems',33:'Safeguards During Construction'},
+ CM:{1:'Fundamentals of Concrete',2:'The Fresh Concrete',3:'The Strength of Concrete',4:'The Durability of Concrete',5:'Volume Changes and Other Properties',6:'Cracks and Blemishes',7:'Portland Cement',8:'Aggregates',9:'Water and Admixtures',10:'Accessory Materials',11:'Formwork',12:'Proportioning the Concrete Mixture',13:'Testing and Controlling the Concrete',14:'Batching and Mixing the Concrete',15:'Handling and Placing the Concrete',16:'Slabs-on-Ground',17:'Finishing and Curing the Concrete',18:'The Reinforcement',19:'Hot and Cold Weather Concreting',20:'Precast and Prestressed Concrete',21:'Lightweight and Heavyweight Concrete',22:'Special Concreting Techniques',23:'Waterproofing and Dampproofing',24:'Introduction to Inspection',25:'Inspection of Concrete Construction',26:'Quality Control'}};
+/* Exam-weight priority: which chapter to climb next. */
+const MX_PRI={IBC:[10,16,18,23,1,3,5,6,7,9,19,21,17,11,15,14,12,8,22,24,25,26,33,2,4,29],CM:[13,18,19,3,12,15,17,14,16,9,26,11,24,25,4,1,2,6,7,8,22,5,10,20,21,23]};
+const mxChapOf=q=>{if(q.b==='CM'){if(q.ch)return +q.ch;const x=(q.f||'').match(/Chapter (\d+)/);return x?+x[1]:null}
+ const x=(q.r||'').match(/(?:§|Table|Section)\s*(\d{3,4})/)||(q.r||'').match(/\b(\d{3,4})(?:\.\d+)+/);if(!x)return null;const h=x[1];return h.length===3?+h[0]:+h.slice(0,2)};
+let MX_POOL=null;
+function mxPool(){if(MX_POOL)return MX_POOL;MX_POOL={IBC:{},CM:{}};G.Q.filter(q=>q.v&&q.o&&q.o.length===4&&(q.b==='IBC'||q.b==='CM'||!q.b)).forEach(q=>{const b=q.b==='CM'?'CM':'IBC';const c=mxChapOf(q);if(!c||!MX_CH[b][c])return;(MX_POOL[b][c]=MX_POOL[b][c]||[]).push(q)});return MX_POOL}
+function mxS(){S.mx=S.mx||{};S.mx.lk=S.mx.lk||{};S.mx.h=S.mx.h||{};S.mx.t=S.mx.t||{};return S.mx}
+const mxId=(b,c)=>b+'-'+c;
+const mxTiers=b=>b==='IBC'?[1,2,3,4]:[2,3,4];
+const median=a=>{if(!a.length)return null;const s=[...a].sort((x,y)=>x-y);const k=s.length>>1;return s.length%2?s[k]:(s[k-1]+s[k])/2};
+const fmtS=ms=>ms==null?'—':Math.round(ms/1000)+' s';
+function mxTierPool(b,c,k){const all=(mxPool()[b][c]||[]);if(k===2){const p=all.filter(q=>(q.df||1)<=2);return p.length>=6?p:all}if(k===3){const p=all.filter(q=>(q.df||1)>=2);return p.length>=6?p:all}return all}
+function mxStatus(b,c){const M=mxS();const T=M.t[mxId(b,c)]||{};const tiers=mxTiers(b);const passed=tiers.filter(k=>T[k]&&T[k].pass);const cur=tiers.find(k=>!(T[k]&&T[k].pass));
+ const items=b==='IBC'?LK.filter(x=>x.c===c):[];const found=items.filter(x=>(M.lk[LKID(x)]||{}).ok>0).length;const pool=(mxPool()[b][c]||[]).length;
+ const mastered=!cur;const oldest=mastered?Math.min(...tiers.map(k=>T[k].at||0)):0;const recheck=mastered&&Date.now()-oldest>14*864e5;
+ return {T,tiers,passed,cur,mastered,recheck,items:items.length,found,pool,thin:pool<10}}
+function mxPick(b,c){const M=mxS();const items=LK.filter(x=>x.c===c);const now=Date.now();
+ const sc=x=>{const s=M.lk[LKID(x)];const base=x.key?0:2;if(!s)return base;if(!s.last)return base+1;return 4+(1-(now-(s.at||0))/(400*864e5))};
+ return shuffle(items).sort((a,b2)=>sc(a)-sc(b2)).slice(0,MX_TIERS[1].size)}
+function mxPath(x){if(x.tab)return 'Table · '+x.t;const parts=x.n.split('.');const out=[];for(let i=1;i<parts.length;i++){const k=parts.slice(0,i).join('.');if(LKTITLE[k])out.push(LKTITLE[k])}out.push(x.t);return out.join(' › ')}
+const mxNorm=s=>String(s).toLowerCase().replace(/section|table|sec\.|§|\s/g,'').replace(/^t(?=\d)/,'').replace(/\.+$/,'');
+function mxT1Check(b,c){const M=mxS();const id=mxId(b,c);const h=(M.h[id]||[]).slice(-20);const n=LK.filter(x=>x.c===c).length;const need=Math.min(20,n);
+ if(h.length<need)return false;const acc=h.filter(x=>x.ok).length/h.length*100;const med=median(h.filter(x=>x.ok).map(x=>x.ms));return acc>=MX_TIERS[1].pass&&med!=null&&med<=MX_SEC*1000}
+function mxTierDone(R){const M=mxS();const {b,c,k}=R.tier;const id=mxId(b,c);const times=R.qids.map((_,i)=>R.tpq[i]||0);const med=median(times);
+ const pass=R.res.p>=MX_TIERS[k].pass&&med!=null&&med<=MX_SEC*1000;const T=M.t[id]=M.t[id]||{};const prev=T[k]||{};
+ T[k]={best:Math.max(prev.best||0,R.res.p),last:R.res.p,med,runs:(prev.runs||0)+1,pass:prev.pass||pass,at:pass?Date.now():(prev.at||0)};
+ R.res.tierMsg=pass?`Tier ${k} passed: ${R.res.p}% with a median of ${fmtS(med)} per question.`:`Tier ${k} needs ${MX_TIERS[k].pass}% with a median of ${MX_SEC} s or less. This run: ${R.res.p}%, median ${fmtS(med)}.`;
+ autoDone('mastery')}
+function mxStartTier(m,b,c,k){const pool=mxTierPool(b,c,k);if(!pool.length){toast('No questions for this chapter yet');return}
+ const seen=q=>{const a=S.att[q.id];return a&&a.length?(a[a.length-1].ok?2:1):0};
+ const pick=shuffle(pool).sort((x,y)=>seen(x)-seen(y)).slice(0,MX_TIERS[k].size).map(q=>q.id);
+ startRun('tier',pick,pick.length*MX_SEC,`${b==='CM'?'Concrete Manual':'IBC'} Ch. ${c} · Tier ${k} ${MX_TIERS[k].name}`);S.run.tier={b,c,k};save();runView(m,'mastery-'+b+'-'+c)}
+function vMastery(m){const parts=(location.hash.slice(1)||'mastery').split('-');const b=parts[1]==='CM'?'CM':parts[1]==='IBC'?'IBC':null;const c=parts[2]?+parts[2]:null;
+ if(S.run&&S.run.kind==='tier'){const back='mastery-'+S.run.tier.b+'-'+S.run.tier.c;if(S.run.done){resultView(m,back,'all');return mxMsg(m)}return runView(m,back)}
+ if(b&&c&&MX_CH[b][c])return mxChapter(m,b,c);
+ const bk=m._mb||'IBC';const M=mxS();
+ const rows=Object.keys(MX_CH[bk]).map(Number).map(ch=>({ch,st:mxStatus(bk,ch)}));
+ const mastered=rows.filter(r=>r.st.mastered).length;
+ const allItems=LK.length,allFound=LK.filter(x=>(M.lk[LKID(x)]||{}).ok>0).length;
+ const allH=Object.values(M.h).flat().slice(-50);const medAll=median(allH.filter(x=>x.ok).map(x=>x.ms));
+ const nextCh=MX_PRI[bk].map(ch=>rows.find(r=>r.ch===ch)).find(r=>r&&!r.st.mastered&&r.st.pool>0)||rows.find(r=>r.st.recheck);
+ const chip=(st,k)=>{const T=st.T[k]||{};const on=T.pass;const cur=st.cur===k;return `<span class="mx-chip ${on?'on':cur?'cur':''}" title="Tier ${k} ${MX_TIERS[k].name}${T.best!=null?': best '+T.best+'%':''}">${on?'✓':k}</span>`};
+ m.innerHTML=`${head('Lookup mastery','Climb four tiers in every chapter: locate, read, catch the conditions, then do it fast. Target: 90 seconds or less per lookup.')}
+ <section class="card stack"><div class="mx-tiers">${[1,2,3,4].map(k=>`<div class="mx-tier"><span class="mx-chip cur">${k}</span><div><b>${MX_TIERS[k].name}</b><p class="muted small">${MX_TIERS[k].goal}. Pass: ${MX_TIERS[k].pass}%, median ${MX_SEC} s or less.</p></div></div>`).join('')}</div>
+  <p class="muted small">Use your printed book and tabs, not PDF search: you won't have search on exam day. A chapter is mastered when every tier is passed; mastered chapters ask for a re-check after 14 days.</p></section>
+ <div class="seg" role="tablist" aria-label="Book"><button role="tab" data-mb="IBC" aria-selected="${bk==='IBC'}">2018 IBC</button><button role="tab" data-mb="CM" aria-selected="${bk==='CM'}">Concrete Manual</button></div>
+ <section class="tiles"><div class="tile"><span class="lab">Chapters mastered</span><span class="val">${mastered}/${rows.length}</span></div>
+  <div class="tile"><span class="lab">IBC sections found</span><span class="val">${allFound}/${allItems}</span><span class="muted">${pct(allFound,allItems)}% coverage</span></div>
+  <div class="tile"><span class="lab">Median lookup time</span><span class="val">${fmtS(medAll)}</span><span class="muted">Last 50 lookups · target 90 s</span></div></section>
+ ${nextCh?`<section class="card mx-next"><div><div class="eyebrow">Recommended next</div><h2 class="h3">Ch. ${nextCh.ch} ${esc(MX_CH[bk][nextCh.ch])} · ${nextCh.st.mastered?'re-check':'Tier '+nextCh.st.cur+' '+MX_TIERS[nextCh.st.cur].name}</h2></div><a class="btn primary" href="#mastery-${bk}-${nextCh.ch}">Open chapter</a></section>`:''}
+ ${bk==='CM'?'<p class="callout">Concrete Manual chapters start at Tier 2: the app does not have the Manual\'s section headings for Tier 1 lookups. Use the Manual\'s contents and index on every question.</p>':''}
+ <section class="card"><ul class="mx-list">${rows.map(r=>`<li><a href="#mastery-${bk}-${r.ch}"><span class="mx-no">${r.ch}</span><span class="mx-ct">${esc(MX_CH[bk][r.ch])}<small>${bk==='IBC'?`${r.st.found}/${r.st.items} sections found · `:''}${r.st.pool} questions${r.st.thin?' · thin':''}</small></span><span class="mx-chips">${r.st.tiers.map(k=>chip(r.st,k)).join('')}</span><span class="pill ${r.st.mastered?(r.st.recheck?'warn':'ok'):''}">${r.st.mastered?(r.st.recheck?'Re-check due':'Mastered'):r.st.pool||bk==='IBC'?'Tier '+r.st.cur:'No questions yet'}</span></a></li>`).join('')}</ul></section>`;
+ m.querySelectorAll('[data-mb]').forEach(x=>x.onclick=()=>{m._mb=x.dataset.mb;vMastery(m)})}
+function mxChapter(m,b,c){const st=mxStatus(b,c);const M=mxS();const T=st.T;
+ if(m._t1&&m._t1.b===b&&m._t1.c===c&&!m._t1.over)return mxT1(m);
+ const items=b==='IBC'?LK.filter(x=>x.c===c):[];
+ const h=(M.h[mxId(b,c)]||[]).slice(-20);const acc=h.length?pct(h.filter(x=>x.ok).length,h.length):null;const med=median(h.filter(x=>x.ok).map(x=>x.ms));
+ const card=k=>{const t=T[k]||{};const locked=st.tiers.indexOf(k)>st.tiers.indexOf(st.cur)&&!t.pass;const pool=k===1?items.length:mxTierPool(b,c,k).length;
+  return `<div class="mx-card ${t.pass?'on':''} ${st.cur===k?'cur':''}"><div class="row between"><b>Tier ${k} · ${MX_TIERS[k].name}</b><span class="pill ${t.pass?'ok':''}">${t.pass?'Passed':locked?'Locked':'Open'}</span></div><p class="muted small">${MX_TIERS[k].goal}. Pass: ${MX_TIERS[k].pass}% and a median of ${MX_SEC} s or less.</p>
+  <p class="small">${k===1?(h.length?`Last ${h.length} lookups: ${acc}% correct, median ${fmtS(med)}`:'No lookups yet'):(t.runs?`Best ${t.best}% · last ${t.last}% · median ${fmtS(t.med)}`:'Not tried yet')} · ${pool} ${k===1?'sections and tables':'questions'}</p>
+  <button class="btn ${st.cur===k?'primary':''} sm" data-tier="${k}" ${locked||!pool?'disabled':''}>${k===1?'Start 10 lookups':'Start '+Math.min(pool,MX_TIERS[k].size)+' questions'}</button></div>`};
+ const map=items.length?`<section class="card stack"><div class="row between"><h2 class="h3">Coverage map</h2><span class="muted small">${st.found}/${items.length} found · <i class="mx-c ok"></i> found <i class="mx-c bad"></i> last try missed <i class="mx-c"></i> not yet <i class="mx-c key"></i> key section</span></div>
+  <div class="mx-map">${items.map(x=>{const s=M.lk[LKID(x)];return `<span class="mx-c ${s?(s.last?'ok':'bad'):''} ${x.key?'key':''}" title="${x.tab?'Table ':'§'}${x.n} ${esc(x.t)} · p. ${x.p}${s?' · '+s.n+' tries':''}"></span>`}).join('')}</div>
+  <p class="muted small">Each square is one section or table, in book order. Hover or long-press for its number and page. Key sections (outlined) are the ones the question bank cites; drills serve them first.</p></section>`:'';
+ m.innerHTML=`${head(`${b==='CM'?'Concrete Manual':'IBC'} Chapter ${c}: ${MX_CH[b][c]}`,st.mastered?(st.recheck?'Mastered · re-check due: run any tier again to confirm.':'Mastered. Re-check in 14 days.'):`Current tier: ${st.cur} ${MX_TIERS[st.cur].name}`)}
+ <div class="row"><a class="btn sm" href="#mastery">← All chapters</a><button class="btn sm" id="mxBook">📖 Open my ${b==='CM'?'Concrete Manual':'IBC'}</button></div>
+ ${st.thin?`<p class="callout">This chapter has only ${st.pool} verified questions, so Tiers ${b==='IBC'?'2–4':'2–4'} repeat quickly and scores may run high. Lean on the book and Tier 1.</p>`:''}
+ <section class="mx-cards">${st.tiers.map(card).join('')}</section>${map}`;
+ m.querySelectorAll('[data-tier]').forEach(x=>x.onclick=()=>{const k=+x.dataset.tier;if(k===1){m._t1={b,c,items:mxPick(b,c),i:0,res:[],t0:Date.now(),ans:null};mxT1(m)}else mxStartTier(m,b,c,k)});
+ $('#mxBook').onclick=()=>{if(b==='CM')G.READER.open('cm',{find:MX_CH.CM[c]});else{const p=Math.min(...items.map(x=>x.p));G.READER.open('ibc',{printed:isFinite(p)?p:null})}}}
+function mxT1(m){const R=m._t1;const x=R.items[R.i];const M=mxS();
+ if(!x){R.over=true;const ok=R.res.filter(r=>r.ok).length;const med=median(R.res.filter(r=>r.ok).map(r=>r.ms));const pass=mxT1Check(R.b,R.c);const T=M.t[mxId(R.b,R.c)]=M.t[mxId(R.b,R.c)]||{};
+  if(pass&&!(T[1]&&T[1].pass))T[1]={pass:true,at:Date.now()};else if(pass)T[1].at=Date.now();save();autoDone('mastery');
+  m.innerHTML=`${head('Tier 1 · Locate: results',`${ok}/${R.res.length} found · median ${fmtS(med)} for correct lookups`)}
+  <section class="card stack"><p class="${pass?'ok':''}"><b>${pass?'Tier 1 passed for this chapter.':'Tier 1 passes at 90% correct over your last 20 lookups, with a median of 90 s or less.'}</b></p>
+  <div class="tbl"><table><thead><tr><th>Find</th><th>Answer</th><th>You</th><th>Time</th></tr></thead><tbody>${R.res.map(r=>`<tr><td>${esc(mxPath(r.x))}</td><td>${r.x.tab?'Table ':'§'}${esc(r.x.n)} · p. ${r.x.p}</td><td>${r.ok?'✓':'✗ '+esc(r.a||'skipped')}</td><td>${fmtS(r.ms)}</td></tr>`).join('')}</tbody></table></div>
+  <div class="row"><button class="btn primary" id="t1Again">Another 10</button><button class="btn" id="t1Back">Back to chapter</button></div></section>`;
+  $('#t1Again').onclick=()=>{m._t1={b:R.b,c:R.c,items:mxPick(R.b,R.c),i:0,res:[],t0:Date.now(),ans:null};mxT1(m)};$('#t1Back').onclick=()=>{m._t1=null;mxChapter(m,R.b,R.c)};return}
+ if(R.ans){const r=R.ans;m.innerHTML=`${head(`Tier 1 · Locate · ${R.i+1}/${R.items.length}`,`IBC Chapter ${R.c}`)}
+  <section class="card stack mx-q"><div class="fb ${r.ok?'good':'bad'}" role="status"><b>${r.ok?'Found it.':'Not quite.'}</b> ${x.tab?'Table ':'§'}${esc(x.n)} · ${esc(x.t)} · page ${x.p} · ${fmtS(r.ms)}${r.ok&&r.ms>MX_SEC*1000?' (over 90 s: work on speed)':''}</div>
+  <div class="row"><button class="btn primary" id="t1Next">${R.i+1<R.items.length?'Next lookup':'See results'} (N)</button><button class="btn" id="t1Page">📖 Show page ${x.p}</button></div></section>`;
+  const nx=()=>{R.ans=null;R.i++;R.t0=Date.now();mxT1(m)};$('#t1Next').onclick=nx;$('#t1Next').focus();
+  $('#t1Page').onclick=()=>G.READER.open('ibc',{printed:x.p,ref:(x.tab?'Table ':'§')+x.n});
+  m.onkeydown=e=>{if(e.key==='n'||e.key==='N'){if(document.activeElement.tagName!=='INPUT')nx()}};return}
+ m.innerHTML=`${head(`Tier 1 · Locate · ${R.i+1}/${R.items.length}`,`IBC Chapter ${R.c}: ${MX_CH.IBC[R.c]}`)}
+ <section class="card stack mx-q"><div class="row between"><span class="eyebrow">${x.tab?'Find this table':'Find this section'}${x.key?' · key':''}</span><span class="mx-clk" id="t1Clk" aria-live="off">0 s</span></div>
+ <p class="mx-prompt">${esc(mxPath(x))}</p>
+ <form id="t1F" class="row" autocomplete="off"><label class="sr" for="t1A">Section or table number</label><input id="t1A" inputmode="decimal" placeholder="${x.tab?'e.g. 1607.1':'e.g. 1011.5.2'}" style="flex:1 1 180px;min-width:0"><button class="btn primary" type="submit">Check</button><button class="btn" type="button" id="t1Skip">Skip</button></form>
+ <p class="muted small">Use the contents, the index and your tabs. The clock starts when the item appears; 90 s is the target.</p></section>`;
+ const clk=$('#t1Clk');clearInterval(timer);timer=setInterval(()=>{const s=Math.floor((Date.now()-R.t0)/1000);if(!document.body.contains(clk)){clearInterval(timer);return}clk.textContent=s+' s';clk.classList.toggle('over',s>MX_SEC)},250);
+ const done=a=>{clearInterval(timer);const ms=Date.now()-R.t0;const ok=a!=null&&mxNorm(a)===mxNorm(x.n);const key=LKID(x);const s=M.lk[key]||{n:0,ok:0};s.n++;if(ok)s.ok++;s.last=ok;s.at=Date.now();s.ms=ms;M.lk[key]=s;
+  const id=mxId(R.b,R.c);(M.h[id]=M.h[id]||[]).push({ok,ms});M.h[id]=M.h[id].slice(-60);R.res.push({x,ok,ms,a});R.ans={ok,ms};save();mxT1(m)};
+ $('#t1F').onsubmit=e=>{e.preventDefault();const v=$('#t1A').value.trim();if(!v){toast('Type the number you found, or Skip');return}done(v)};
+ $('#t1Skip').onclick=()=>done(null);$('#t1A').focus()}
+
+function mxMsg(m){const R=S.run;if(R&&R.res&&R.res.tierMsg)m.insertAdjacentHTML('afterbegin',`<p class="callout"><b>${esc(R.res.tierMsg)}</b></p>`)}
 
 /* ---------- boot ---------- */
 const API={get S(){return S},save,toast,esc,head,say,go};
