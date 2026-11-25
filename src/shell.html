@@ -268,10 +268,14 @@ ol.rules{margin:0;padding-left:22px;display:grid;gap:8px}ol.rules .ref{color:var
 .mx-clk{font:700 1.4rem var(--f-m);color:var(--act)}.mx-clk.over{color:var(--bad)}
 @media (max-width:600px){.mx-list a{grid-template-columns:2em minmax(0,1fr) auto}.mx-list a .pill{grid-column:2/-1;justify-self:start}}
 /* lesson explainer */
+.stage .hy{fill:#ffe066}.stage .hb{fill:#8ec5ff}.stage .hp{fill:#ffb3c7}.stage .hg{fill:#9be3b0}.stage .draw2{animation:pop .6s .3s ease both}
+.player.plc .plbody[hidden]{display:none}.player.plc{position:static}
+.simple{margin-top:8px;padding:12px 14px;border-radius:10px;background:var(--soft);border-left:5px solid var(--d4)}.simple-in p{margin:.3em 0}
+.terms.sm dt{font-size:.92rem}.terms.sm dd{font-size:.92rem}
 .lgrid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;align-items:start}
 @media (max-width:900px){.lgrid{grid-template-columns:minmax(0,1fr)}.lgrid .player{order:-1;position:static}}
 .easy{border-left:6px solid var(--d4)}
-.player{position:sticky;top:84px}
+.lgrid>.player{position:sticky;top:84px}
 .stage{position:relative;aspect-ratio:16/11;border-radius:14px;overflow:hidden;background:linear-gradient(160deg,var(--soft),var(--paper));border:1px solid var(--line);display:grid;grid-template-rows:1fr auto;padding:10px 14px 12px}
 .stage .art{display:grid;place-items:center;min-height:0}.stage svg{width:min(100%,360px);height:100%;max-height:100%;animation:artIn .5s ease both}
 .stage .sttl{font:800 clamp(1.15rem,3.2vw,1.6rem)/1.15 var(--f-d);text-align:center;animation:artIn .5s .15s ease both}

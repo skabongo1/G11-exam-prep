@@ -116,7 +116,7 @@ function goTask(k){S.pend={type:k.type,ref:k.ref||null};save();location.hash=tas
 function qMeta(q){return `<div class="qmeta"><span class="pill" style="--c:${DCOL[q.d]}">${esc(DOM[q.d]?DOM[q.d].name:'')}</span><span class="pill plain">${esc(q.s)}</span><span class="pill plain">${['','Basic','Intermediate','Advanced'][q.df]}</span><span class="pill plain">${q.b==='CM'?'Concrete Manual':q.b==='MATH'?'Calculation':'2018 IBC'}</span>${q.v?'<span class="pill ok">Verified</span>':'<span class="pill warn">Demonstration · pending verification</span>'}</div>`}
 function feedback(q,sel){const ok=sel===q.a;return `<div class="fb ${ok?'good':'bad'}" role="status"><b>${ok?'Correct.':sel==null||sel<0?'Not answered. Answer: '+L4[q.a]+'.':'Not quite. Answer: '+L4[q.a]+'.'}</b><p>${esc(q.ex)}</p>
  <details ${ok?'':'open'}><summary>Why each option is right or wrong</summary><ul>${q.o.map((o,j)=>`<li><b>${L4[j]}.</b> ${j===q.a?'Correct. ':''}${esc(q.w[j]||q.ex)}</li>`).join('')}</ul></details>
- <p class="ref"><b>Reference:</b> ${esc(q.r)}${q.p?' · page '+q.p:''} · <b>How to find it:</b> ${esc(q.f)}</p>${q.b==='IBC'||q.b==='CM'?`<div class="row"><button class="mini" data-openq="${q.id}">📖 Open in my ${q.b==='CM'?'Concrete Manual':'IBC'}</button></div>`:''}</div>`}
+ <p class="ref"><b>Reference:</b> ${esc(q.r)}${q.p?' · page '+q.p:''} · <b>How to find it:</b> ${esc(q.f)}</p>${q.b==='IBC'||q.b==='CM'?`<div class="row"><button class="mini" data-openq="${q.id}">📖 Open in my ${q.b==='CM'?'Concrete Manual':'IBC'}</button></div>`:''}<div class="row"><button class="mini simple-btn" data-simple="${q.id}" aria-expanded="false">💡 Explain it simply</button></div><div class="simple" hidden></div></div>`}
 function findKey(q){const r=q.r.replace(/^Concrete Manual\s*/,'');let m=r.match(/Table\s+[\d.]+/);if(m)return m[0];m=r.match(/^(\d+\.\d+)/);if(m)return m[1];m=r.match(/Ch\.\s*(\d+)/);if(m&&q.ch)return '';return q.f.split('→')[1]?q.f.split('→')[1].split(',').pop().trim():''}
 function openQ(q){if(q.b==='CM'){const k=findKey(q);const t=(q.f.match(/Chapter \d+, ([^→]+)/)||[])[1];G.READER.open('cm',{find:k||(t?t.trim():'')})}else G.READER.open('ibc',{printed:q.p?+q.p:null,ref:(q.r.match(/(?:Table\s+[\d.]+|§\s*[\d.]+)/)||[q.r])[0]})}
 function celebrate(scope,qid,o){const q=QBY[qid];if(!q||!scope)return;window.G11FX.off=S.fx===false;const card=scope.querySelector(`.q[data-q="${qid}"]`)||scope;const b=card.querySelector(`.opt[data-o="${o}"]`);if(o===q.a)window.G11FX.right(b);else{window.G11FX.wrong(b);const ok=card.querySelector(`.opt[data-o="${q.a}"]`);if(ok)ok.classList.add('fx-reveal')}}
@@ -305,21 +305,41 @@ function vRules(m){const subs=[];G.EXAM.domains.forEach(d=>d.subs.forEach(s=>sub
  const list=VER.filter(q=>q.s===cur).sort((a,b)=>(a.b>b.b?1:a.b<b.b?-1:0)||num(a.r)-num(b.r));
  m.innerHTML=`<nav class="crumbs"><a href="#learn">Course</a> › Rule sheets</nav>${head('Rule sheets','One line per verified rule. Tap 📖 to open the page in your own copy of the book.')}
  <div class="field"><label for="rsSel">Subtopic</label><select id="rsSel">${G.EXAM.domains.map(d=>`<optgroup label="${esc(d.name)} · ${d.w}%">${d.subs.map(s=>`<option ${s===cur?'selected':''}>${esc(s)}</option>`).join('')}</optgroup>`).join('')}</select></div>
- <section class="card stack"><h2 class="h3">${esc(cur)} · ${list.length} rules</h2><ol class="rules">${list.map(q=>`<li><span>${esc(q.ex)}</span> <span class="ref">${esc(q.r)}${q.p?' · p. '+q.p:''}</span>${q.b!=='MATH'?` <button class="mini" data-openq="${q.id}" aria-label="Open in my book">📖</button>`:''}</li>`).join('')}</ol></section>`;
- $('#rsSel').onchange=e=>{m._rs=e.target.value;vRules(m)}}
-function lessonPlayer(m,id){const E=(G.EASY||{})[id];const st=$('#plStage');if(!E||!st)return;const sc=E.scenes;let i=0,playing=false,voice=false;
- const hasVoice='speechSynthesis' in window;if(!hasVoice)$('#plVoice').hidden=true;
+ <section class="lgrid"><section class="card stack"><h2 class="h3">${esc(cur)} · ${list.length} rules</h2><ol class="rules">${list.map(q=>`<li><span>${esc(q.ex)}</span> <span class="ref">${esc(q.r)}${q.p?' · p. '+q.p:''}</span>${q.b!=='MATH'?` <button class="mini" data-openq="${q.id}" aria-label="Open in my book">📖</button>`:''}</li>`).join('')}</ol></section>${playerCard('R:'+cur)||'<span></span>'}</section>`;
+ $('#rsSel').onchange=e=>{m._rs=e.target.value;vRules(m)};mountPlayers(m)}
+/* ---------- Animated explainer player (lessons, rule sheets, scenarios, guides, mastery) ---------- */
+let PL_STOP=null;
+const plScenes=k=>k.startsWith('L:')?(((G.EASY||{})[k.slice(2)]||{}).scenes||null):((G.EXPL||{})[k]||null);
+function playerCard(k,o){o=o||{};if(!plScenes(k))return '';return `<section class="card stack player${o.collapsed?' plc':''}" data-pl="${esc(k)}" aria-label="Animated explainer">
+ <div class="row between"><h2 class="h3">${esc(o.title||'Animated explainer')}</h2><span class="muted small pln"></span></div>
+ ${o.collapsed?'<button class="btn sm plopen">▶ Watch the animated explainer</button>':''}
+ <div class="plbody" ${o.collapsed?'hidden':''}><div class="stage"></div><p class="plcap" aria-live="polite"></p><div class="pldots"></div>
+ <div class="row plctl"><button class="btn sm plprev" aria-label="Previous scene">◀</button><button class="btn primary sm plplay">▶ Play</button><button class="btn sm plnext" aria-label="Next scene">▶</button><button class="btn sm plvoice" role="switch" aria-checked="false">🔈 Voice off</button></div>
+ <p class="muted small">Plays scene by scene. The voice uses your device's built-in reader.</p></div></section>`}
+function mountPlayers(root){root.querySelectorAll('[data-pl]').forEach(el=>{if(el._pl)return;el._pl=1;const sc=plScenes(el.dataset.pl);if(!sc)return;
+ const q=s=>el.querySelector(s);let i=0,playing=false,voice=false;const hasVoice='speechSynthesis' in window;if(!hasVoice)q('.plvoice').hidden=true;
  const stopAll=()=>{clearTimeout(timer);try{if(hasVoice)speechSynthesis.cancel()}catch(e){}};
- const show=()=>{const x=sc[i];st.innerHTML=`<div class="art">${(G.ART||{})[x.a]||''}</div><div class="sttl">${esc(x.t)}</div>`;$('#plCap').textContent=x.c;$('#plN').textContent=`Scene ${i+1} of ${sc.length}`;
-  $('#plDots').innerHTML=sc.map((_,k)=>`<button class="dot ${k===i?'on':''}" data-k="${k}" aria-label="Scene ${k+1}"></button>`).join('');
-  $('#plDots').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{stopAll();i=+b.dataset.k;show();if(playing)run()})};
- const adv=()=>{if(!playing)return;if(i<sc.length-1){i++;show();run()}else{playing=false;$('#plPlay').textContent='⟲ Replay'}};
+ const halt=()=>{playing=false;stopAll();q('.plplay').textContent='▶ Play'};
+ const show=()=>{const x=sc[i];q('.stage').innerHTML=`<div class="art">${(G.ART||{})[x.a]||''}</div><div class="sttl">${esc(x.t)}</div>`;q('.plcap').textContent=x.c;q('.pln').textContent=`Scene ${i+1} of ${sc.length}`;
+  q('.pldots').innerHTML=sc.map((_,k)=>`<button class="dot ${k===i?'on':''}" data-k="${k}" aria-label="Scene ${k+1}"></button>`).join('');
+  q('.pldots').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{stopAll();i=+b.dataset.k;show();if(playing)run()})};
+ const adv=()=>{if(!playing)return;if(i<sc.length-1){i++;show();run()}else{playing=false;q('.plplay').textContent='⟲ Replay'}};
  const run=()=>{stopAll();const x=sc[i];if(voice&&hasVoice){const u=new SpeechSynthesisUtterance(x.s);u.rate=0.95;u.onend=()=>{if(playing)timer=setTimeout(adv,600)};try{speechSynthesis.speak(u)}catch(e){timer=setTimeout(adv,4000)}}else{timer=setTimeout(adv,Math.max(3800,x.s.split(' ').length*380))}};
- $('#plPlay').onclick=()=>{if(playing){playing=false;stopAll();$('#plPlay').textContent='▶ Play';return}if(i>=sc.length-1){i=0;show()}playing=true;$('#plPlay').textContent='⏸ Pause';run()};
- $('#plPrev').onclick=()=>{stopAll();i=Math.max(0,i-1);show();if(playing)run()};
- $('#plNext').onclick=()=>{stopAll();i=Math.min(sc.length-1,i+1);show();if(playing)run()};
- $('#plVoice').onclick=()=>{voice=!voice;$('#plVoice').setAttribute('aria-checked',String(voice));$('#plVoice').textContent=voice?'🔊 Voice on':'🔈 Voice off';if(playing)run();else if(!voice)stopAll()};
- show()}
+ q('.plplay').onclick=()=>{if(playing){halt();return}if(PL_STOP&&PL_STOP!==halt)PL_STOP();PL_STOP=halt;if(i>=sc.length-1){i=0;show()}playing=true;q('.plplay').textContent='⏸ Pause';run()};
+ q('.plprev').onclick=()=>{stopAll();i=Math.max(0,i-1);show();if(playing)run()};
+ q('.plnext').onclick=()=>{stopAll();i=Math.min(sc.length-1,i+1);show();if(playing)run()};
+ q('.plvoice').onclick=()=>{voice=!voice;q('.plvoice').setAttribute('aria-checked',String(voice));q('.plvoice').textContent=voice?'🔊 Voice on':'🔈 Voice off';if(playing)run();else if(!voice)stopAll()};
+ const op=q('.plopen');if(op)op.onclick=()=>{op.remove();q('.plbody').hidden=false;el.classList.remove('plc');show()};
+ if(!op)show()})}
+/* ---------- Explain it simply ---------- */
+function simpleHTML(q){const txt=[q.q,...q.o,q.ex,q.r].join(' ');const words=(G.GLOSS||[]).filter(g=>new RegExp('\\b'+g[0].replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i').test(txt)).slice(0,7);
+ const sub=(G.SUBPLAIN||{})[q.s];const book=q.b==='CM'?'the Concrete Manual':q.b==='MATH'?'your scratch paper (a calculation)':'the 2018 IBC';
+ return `<div class="simple-in"><p><b>What it is really asking:</b> ${sub?`a question about ${esc(sub)}.`:'see the question above.'}</p>
+ <p><b>Where to look:</b> ${(()=>{const w=q.b==='MATH'?'':(q.f||q.r||'');return /^(the )?(Concrete Manual|IBC|2018 IBC)/i.test(w)?esc(w):esc(book)+(w?' → '+esc(w):'')})()}${q.p?' (page '+q.p+')':''}.</p>
+ <p><b>The answer:</b> ${esc(q.o[q.a])}</p><p><b>Why:</b> ${esc(q.ex)}</p>
+ ${words.length?`<p><b>Words to know</b></p><dl class="terms sm">${words.map(g=>`<dt>${esc(g[0])}</dt><dd>${esc(g[1])}</dd>`).join('')}</dl>`:''}</div>`}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-simple]');if(!b)return;const q=QBY[b.dataset.simple];const box=b.closest('.fb').querySelector('.simple');if(!q||!box)return;
+ if(box.hidden){box.innerHTML=simpleHTML(q);box.hidden=false;b.setAttribute('aria-expanded','true')}else{box.hidden=true;b.setAttribute('aria-expanded','false')}});
 function vLesson(m,id){const l=LBY[id];const md=G.MODULES.find(x=>x.id===l.mod);S.lessons[id]=Object.assign({seen:true},S.lessons[id]||{});save();
  const ls=G.LESSONS.filter(x=>x.mod===l.mod);const i=ls.indexOf(l);const qs=l.quiz.map(x=>QBY[x]);const ans=(S.lessons[id].ans)||{};
  m.innerHTML=`<nav class="crumbs" aria-label="Breadcrumb"><a href="#learn">Course</a> › Module ${md.id} › ${l.id}</nav>
@@ -328,11 +348,7 @@ function vLesson(m,id){const l=LBY[id];const md=G.MODULES.find(x=>x.id===l.mod);
  <section class="card stack"><h2 class="h3">You will be able to</h2><ul class="tight">${l.objectives.map(o=>`<li>${esc(o)}</li>`).join('')}</ul></section>
  ${(()=>{const E=(G.EASY||{})[id];const plain=`<section class="card stack prose"><h2 class="h3">Plain-language explanation</h2>${l.explain}</section>`;if(!E)return plain;
   return `<section class="lgrid"><div class="stack">${plain}<section class="card stack prose easy"><h2 class="h3">In everyday words</h2>${E.easy}</section></div>
-  <section class="card stack player" aria-label="Animated explainer"><div class="row between"><h2 class="h3">Animated explainer</h2><span class="muted small" id="plN"></span></div>
-  <div class="stage" id="plStage"></div><p class="plcap" id="plCap" aria-live="polite"></p>
-  <div class="pldots" id="plDots"></div>
-  <div class="row plctl"><button class="btn sm" id="plPrev" aria-label="Previous scene">◀</button><button class="btn primary sm" id="plPlay">▶ Play</button><button class="btn sm" id="plNext" aria-label="Next scene">▶</button><button class="btn sm" id="plVoice" role="switch" aria-checked="false">🔈 Voice off</button></div>
-  <p class="muted small">Plays scene by scene. The voice uses your device's built-in reader.</p></section></section>`})()}
+  ${playerCard('L:'+id)}</section>`})()}
  <section class="grid2"><div class="card stack"><h2 class="h3">Terms</h2><dl class="terms">${l.terms.map(t=>`<dt>${esc(t[0])}</dt><dd>${esc(t[1])}</dd>`).join('')}</dl></div><div class="card stack visual"><h2 class="h3">Diagram or worked example</h2>${l.visual}</div></section>
  <section class="card stack prose"><h2 class="h3">On the job</h2>${l.apply}</section>
  <section class="card stack"><h2 class="h3">Find it in your book</h2><p><b>Task:</b> ${esc(l.lookup.task)}</p><ol class="tight">${l.lookup.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol><details><summary>Show answer</summary><p><b>${esc(l.lookup.answer)}</b> (${l.book==='CM'?'Concrete Manual, 2021 IBC / ACI 318-19 edition':'2018 IBC, first printing'})</p></details></section>
@@ -344,7 +360,7 @@ function vLesson(m,id){const l=LBY[id];const md=G.MODULES.find(x=>x.id===l.mod);
   rec(qid,o,'lesson',ms);S.lessons[id].ans=Object.assign({},S.lessons[id].ans,{[qid]:o});
   if(Object.keys(S.lessons[id].ans).length===qs.length&&!S.lessons[id].done){S.lessons[id].done=true;autoDone('lesson',id);const c=qs.filter(q=>S.lessons[id].ans[q.id]===q.a).length;log('lesson','Lesson '+id+' quiz',pct(c,qs.length));toast('Lesson complete');$('#lDone').textContent='Lesson complete ✓'}
   save();const k=qs.findIndex(q=>q.id===qid);card.outerHTML=qCard(QBY[qid],k,o,{fb:true});celebrate($('#lq'),qid,o);say(o===QBY[qid].a?'Correct':'Incorrect')};
- $('#lDone').onclick=()=>{S.lessons[id].done=true;autoDone('lesson',id);save();$('#lDone').textContent='Lesson complete ✓'};lessonPlayer(m,id)}
+ $('#lDone').onclick=()=>{S.lessons[id].done=true;autoDone('lesson',id);save();$('#lDone').textContent='Lesson complete ✓'};mountPlayers(m)}
 
 /* ---------- Practice ---------- */
 function vPractice(m){if(S.run&&(S.run.kind==='quiz')){if(S.run.done)return resultView(m,'practice','all');return runView(m,'practice')}
@@ -381,6 +397,7 @@ function vScn(m,id){const sc=SBY[id];let seed=(m._seed&&m._sid===id)?m._seed:Mat
  let s=seed;const rnd=()=>{s=(s*1664525+1013904223)%4294967296;return s/4294967296};const V=sc.gen(rnd);
  const graded=V.steps.filter(x=>x.k!=='explain').length;let step=0,first=0,tries=0;
  m.innerHTML=`<nav class="crumbs"><a href="#scenarios">Scenarios</a> › ${esc(sc.title)}</nav>${head(esc(sc.title),DOM[sc.d].name)}
+ ${playerCard('S:'+id,{collapsed:true,title:'Animated walkthrough of this case'})}
  <section class="grid2"><div class="card stack"><h2 class="h3">1 · Project facts</h2>${V.facts}</div>
  <div class="card stack"><h2 class="h3">2 · Inspect the drawings</h2><div class="drawing">${V.svg}</div><div class="row">${V.hot.map((h,i)=>`<button class="btn sm" data-hot="${i}" aria-expanded="false">${esc(h[0])}</button>`).join('')}</div><div id="hotOut" class="hotout" aria-live="polite"><p class="muted">Select a callout to read its detail.</p></div></div></section>
  <section class="card stack" id="steps"></section>`;
@@ -404,7 +421,7 @@ function vScn(m,id){const sc=SBY[id];let seed=(m._seed&&m._sid===id)?m._seed:Mat
    const fin=(ok,given)=>{if(ok&&tries===1&&!given)first++;$('#sfb').innerHTML=`<div class="fb ${ok&&!given?'good':'bad'}"><b>${ok&&!given?'Correct.':'Answer: '+x.ans+' '+x.unit+'.'}</b> ${x.fb}</div><div class="row"><button class="btn primary" id="snext">Continue</button></div>`;$('#nChk').disabled=true;$('#nGive').disabled=true;$('#snext').onclick=()=>{step++;renderStep()};$('#snext').focus()};
    $('#nChk').onclick=()=>{const v=parseFloat($('#nIn').value);if(isNaN(v)){toast('Enter a number');return}tries++;if(Math.abs(v-x.ans)<=x.tol+1e-9)fin(true);else $('#sfb').innerHTML=`<div class="fb bad"><b>Not quite.</b> Re-check your steps and try again, or show the answer.</div>`};
    $('#nGive').onclick=()=>{tries++;fin(true,true)};$('#nIn').onkeydown=e=>{if(e.key==='Enter')$('#nChk').click()}}};
- renderStep()}
+ renderStep();mountPlayers(m)}
 
 /* ---------- Lookup trainer ---------- */
 function vLookup(m){const st=stats();const pend=S.pend;S.pend=null;save();let cur=null,t0=0,hints=0,tm=null;let set=m._set||null,si=0;
@@ -690,6 +707,7 @@ function vMastery(m){const parts=(location.hash.slice(1)||'mastery').split('-');
  m.innerHTML=`${head('Lookup mastery','Climb four tiers in every chapter: locate, read, catch the conditions, then do it fast. Target: 90 seconds or less per lookup.')}
  <section class="card stack"><div class="mx-tiers">${[1,2,3,4].map(k=>`<div class="mx-tier"><span class="mx-chip cur">${k}</span><div><b>${MX_TIERS[k].name}</b><p class="muted small">${MX_TIERS[k].goal}. Pass: ${MX_TIERS[k].pass}%, median ${MX_SEC} s or less.</p></div></div>`).join('')}</div>
   <p class="muted small">Use your printed book and tabs, not PDF search: you won't have search on exam day. A chapter is mastered when every tier is passed; mastered chapters ask for a re-check after 14 days.</p></section>
+ ${playerCard('X:mastery',{collapsed:true,title:'How the ladder works'})}
  <div class="seg" role="tablist" aria-label="Book"><button role="tab" data-mb="IBC" aria-selected="${bk==='IBC'}">2018 IBC</button><button role="tab" data-mb="CM" aria-selected="${bk==='CM'}">Concrete Manual</button></div>
  <section class="tiles"><div class="tile"><span class="lab">Chapters mastered</span><span class="val">${mastered}/${rows.length}</span></div>
   <div class="tile"><span class="lab">IBC sections found</span><span class="val">${allFound}/${allItems}</span><span class="muted">${pct(allFound,allItems)}% coverage</span></div>
@@ -697,7 +715,7 @@ function vMastery(m){const parts=(location.hash.slice(1)||'mastery').split('-');
  ${nextCh?`<section class="card mx-next"><div><div class="eyebrow">Recommended next</div><h2 class="h3">Ch. ${nextCh.ch} ${esc(MX_CH[bk][nextCh.ch])} · ${nextCh.st.mastered?'re-check':'Tier '+nextCh.st.cur+' '+MX_TIERS[nextCh.st.cur].name}</h2></div><a class="btn primary" href="#mastery-${bk}-${nextCh.ch}">Open chapter</a></section>`:''}
  ${bk==='CM'?'<p class="callout">Concrete Manual Tier 1 asks which Manual section covers a topic, using the sections the workbook answer key cites. Chapters 13, 18 and 19 have it now; other chapters start at Tier 2 until their batch is added.</p>':''}
  <section class="card"><ul class="mx-list">${rows.map(r=>`<li><a href="#mastery-${bk}-${r.ch}"><span class="mx-no">${r.ch}</span><span class="mx-ct">${esc(MX_CH[bk][r.ch])}<small>${r.st.items?`${r.st.found}/${r.st.items} ${bk==='IBC'?'sections':'lookups'} found · `:''}${r.st.pool} questions${r.st.thin?' · thin':''}</small></span><span class="mx-chips">${r.st.tiers.map(k=>chip(r.st,k)).join('')}</span><span class="pill ${r.st.mastered?(r.st.recheck?'warn':'ok'):''}">${r.st.mastered?(r.st.recheck?'Re-check due':'Mastered'):r.st.pool||bk==='IBC'?'Tier '+r.st.cur:'No questions yet'}</span></a></li>`).join('')}</ul></section>`;
- m.querySelectorAll('[data-mb]').forEach(x=>x.onclick=()=>{m._mb=x.dataset.mb;vMastery(m)})}
+ m.querySelectorAll('[data-mb]').forEach(x=>x.onclick=()=>{m._mb=x.dataset.mb;vMastery(m)});mountPlayers(m)}
 function mxChapter(m,b,c){const st=mxStatus(b,c);const M=mxS();const T=st.T;
  if(m._t1&&m._t1.b===b&&m._t1.c===c&&!m._t1.over)return mxT1(m);
  const items=lkOf(b,c);
@@ -743,7 +761,7 @@ function mxT1(m){const R=m._t1;const x=R.items[R.i];const M=mxS();
 function mxMsg(m){const R=S.run;if(R&&R.res&&R.res.tierMsg)m.insertAdjacentHTML('afterbegin',`<p class="callout"><b>${esc(R.res.tierMsg)}</b></p>`)}
 
 /* ---------- boot ---------- */
-const API={get S(){return S},save,toast,esc,head,say,go};
+const API={get S(){return S},save,toast,esc,head,say,go,player:playerCard,mount:mountPlayers};
 regLoad();regSave();load();applyTheme();
 $('#nav').innerHTML=NAV.map(n=>`<a href="#${n[0]}" data-r="${n[0]}">${n[1]}</a>`).join('');
 $('#thBtn').onclick=()=>{S.theme=isDark()?'light':'dark';applyTheme();save()};applyTheme();

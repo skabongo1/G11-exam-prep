@@ -62,6 +62,7 @@ G.GUIDES={view(m,api){const esc=api.esc;let tab=m._gt||'method';
    <div class="row wrap">${x.in.map(f=>`<div class="field sm"><label for="m${i}${f[0]}">${esc(f[1])}</label><input id="m${i}${f[0]}" type="number" step="any" value="${f[2]}" data-mi="${i}" data-k="${f[0]}"></div>`).join('')}</div><div class="out" id="mo${i}"></div></section>`).join('')}</div>`;
   const upd=i=>{const v={};MATH[i].in.forEach(f=>{v[f[0]]=parseFloat(m.querySelector('#m'+i+f[0]).value)||0});m.querySelector('#mo'+i).textContent='= '+MATH[i].calc(v)};
   MATH.forEach((x,i)=>upd(i));m.querySelectorAll('[data-mi]').forEach(e=>e.oninput=()=>upd(+e.dataset.mi))}
+ if(api.player){B.insertAdjacentHTML('afterbegin',api.player('G:'+tab));if(tab==='math')B.querySelectorAll('.out').forEach((o,i)=>o.insertAdjacentHTML('afterend',api.player('M:'+i,{collapsed:true,title:'Animated worked example'})));api.mount(m)}
  m.querySelectorAll('[data-openp]').forEach(b=>b.onclick=()=>G.READER.open('ibc',{printed:b.dataset.openp?+b.dataset.openp:null,ref:b.dataset.ref}));
  m.querySelectorAll('[data-openf]').forEach(b=>b.onclick=()=>G.READER.open('cm',{find:b.dataset.openf}));
 }};
