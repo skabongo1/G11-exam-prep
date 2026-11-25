@@ -136,7 +136,7 @@ document.addEventListener('click',e=>{const oq=e.target.closest('[data-openq]');
 /* ---------------- routing ---------------- */
 const NAV=[['home','Dashboard'],['plan','Study plan'],['learn','Course'],['practice','Practice'],['scenarios','Scenarios'],['lookup','Lookup trainer'],['mastery','Lookup mastery'],['reader','My code books'],['guides','Book guides'],['exam','Practice exams'],['cards','Flashcards'],['info','Exam info'],['account','Accounts'],['data','Data & settings']];
 let timer=null;
-function route(){clearInterval(timer);timer=null;const h=(location.hash||'#home').slice(1)||'home';const main=$('#main');
+function route(){clearInterval(timer);timer=null;try{if('speechSynthesis' in window)speechSynthesis.cancel()}catch(e){}const h=(location.hash||'#home').slice(1)||'home';const main=$('#main');
  const base=h.split('-')[0];$$('#nav a').forEach(a=>a.setAttribute('aria-current',a.dataset.r===base||(base==='lesson'&&a.dataset.r==='learn')||(base==='scn'&&a.dataset.r==='scenarios')||(base==='diagnostic'&&a.dataset.r==='home')||(base==='start'&&a.dataset.r==='home')||(base==='local'&&a.dataset.r==='info')||(base==='rules'&&a.dataset.r==='learn')?'page':'false'));
  const V={home:vHome,start:vStart,diagnostic:vDiag,plan:vPlan,learn:vLearn,practice:vPractice,scenarios:vScenarios,lookup:vLookup,exam:vExam,cards:vCards,info:vInfo,local:vLocal,data:vData,account:vAccount,mastery:vMastery,reader:m=>G.READER.view(m,API),guides:m=>G.GUIDES.view(m,API),rules:vRules};
  if(h.startsWith('lesson-')&&LBY[h.slice(7)])vLesson(main,h.slice(7));else if(h.startsWith('scn-')&&SBY[h.slice(4)])vScn(main,h.slice(4));else if(h.startsWith('mastery-'))vMastery(main);else (V[h]||vHome)(main);
@@ -307,13 +307,32 @@ function vRules(m){const subs=[];G.EXAM.domains.forEach(d=>d.subs.forEach(s=>sub
  <div class="field"><label for="rsSel">Subtopic</label><select id="rsSel">${G.EXAM.domains.map(d=>`<optgroup label="${esc(d.name)} · ${d.w}%">${d.subs.map(s=>`<option ${s===cur?'selected':''}>${esc(s)}</option>`).join('')}</optgroup>`).join('')}</select></div>
  <section class="card stack"><h2 class="h3">${esc(cur)} · ${list.length} rules</h2><ol class="rules">${list.map(q=>`<li><span>${esc(q.ex)}</span> <span class="ref">${esc(q.r)}${q.p?' · p. '+q.p:''}</span>${q.b!=='MATH'?` <button class="mini" data-openq="${q.id}" aria-label="Open in my book">📖</button>`:''}</li>`).join('')}</ol></section>`;
  $('#rsSel').onchange=e=>{m._rs=e.target.value;vRules(m)}}
+function lessonPlayer(m,id){const E=(G.EASY||{})[id];const st=$('#plStage');if(!E||!st)return;const sc=E.scenes;let i=0,playing=false,voice=false;
+ const hasVoice='speechSynthesis' in window;if(!hasVoice)$('#plVoice').hidden=true;
+ const stopAll=()=>{clearTimeout(timer);try{if(hasVoice)speechSynthesis.cancel()}catch(e){}};
+ const show=()=>{const x=sc[i];st.innerHTML=`<div class="art">${(G.ART||{})[x.a]||''}</div><div class="sttl">${esc(x.t)}</div>`;$('#plCap').textContent=x.c;$('#plN').textContent=`Scene ${i+1} of ${sc.length}`;
+  $('#plDots').innerHTML=sc.map((_,k)=>`<button class="dot ${k===i?'on':''}" data-k="${k}" aria-label="Scene ${k+1}"></button>`).join('');
+  $('#plDots').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{stopAll();i=+b.dataset.k;show();if(playing)run()})};
+ const adv=()=>{if(!playing)return;if(i<sc.length-1){i++;show();run()}else{playing=false;$('#plPlay').textContent='⟲ Replay'}};
+ const run=()=>{stopAll();const x=sc[i];if(voice&&hasVoice){const u=new SpeechSynthesisUtterance(x.s);u.rate=0.95;u.onend=()=>{if(playing)timer=setTimeout(adv,600)};try{speechSynthesis.speak(u)}catch(e){timer=setTimeout(adv,4000)}}else{timer=setTimeout(adv,Math.max(3800,x.s.split(' ').length*380))}};
+ $('#plPlay').onclick=()=>{if(playing){playing=false;stopAll();$('#plPlay').textContent='▶ Play';return}if(i>=sc.length-1){i=0;show()}playing=true;$('#plPlay').textContent='⏸ Pause';run()};
+ $('#plPrev').onclick=()=>{stopAll();i=Math.max(0,i-1);show();if(playing)run()};
+ $('#plNext').onclick=()=>{stopAll();i=Math.min(sc.length-1,i+1);show();if(playing)run()};
+ $('#plVoice').onclick=()=>{voice=!voice;$('#plVoice').setAttribute('aria-checked',String(voice));$('#plVoice').textContent=voice?'🔊 Voice on':'🔈 Voice off';if(playing)run();else if(!voice)stopAll()};
+ show()}
 function vLesson(m,id){const l=LBY[id];const md=G.MODULES.find(x=>x.id===l.mod);S.lessons[id]=Object.assign({seen:true},S.lessons[id]||{});save();
  const ls=G.LESSONS.filter(x=>x.mod===l.mod);const i=ls.indexOf(l);const qs=l.quiz.map(x=>QBY[x]);const ans=(S.lessons[id].ans)||{};
  m.innerHTML=`<nav class="crumbs" aria-label="Breadcrumb"><a href="#learn">Course</a> › Module ${md.id} › ${l.id}</nav>
  ${head(`${l.id} · ${esc(l.title)}`,`${DOM[md.d].name} · about ${l.mins} min`,`<button class="btn sm" data-note="l:${id}">${S.notes['l:'+id]?'✎ Edit note':'✎ Add note'}</button>`)}
  <div class="notebox" data-nb="l:${id}" hidden></div>
  <section class="card stack"><h2 class="h3">You will be able to</h2><ul class="tight">${l.objectives.map(o=>`<li>${esc(o)}</li>`).join('')}</ul></section>
- <section class="card stack prose"><h2 class="h3">Plain-language explanation</h2>${l.explain}</section>
+ ${(()=>{const E=(G.EASY||{})[id];const plain=`<section class="card stack prose"><h2 class="h3">Plain-language explanation</h2>${l.explain}</section>`;if(!E)return plain;
+  return `<section class="lgrid"><div class="stack">${plain}<section class="card stack prose easy"><h2 class="h3">In everyday words</h2>${E.easy}</section></div>
+  <section class="card stack player" aria-label="Animated explainer"><div class="row between"><h2 class="h3">Animated explainer</h2><span class="muted small" id="plN"></span></div>
+  <div class="stage" id="plStage"></div><p class="plcap" id="plCap" aria-live="polite"></p>
+  <div class="pldots" id="plDots"></div>
+  <div class="row plctl"><button class="btn sm" id="plPrev" aria-label="Previous scene">◀</button><button class="btn primary sm" id="plPlay">▶ Play</button><button class="btn sm" id="plNext" aria-label="Next scene">▶</button><button class="btn sm" id="plVoice" role="switch" aria-checked="false">🔈 Voice off</button></div>
+  <p class="muted small">Plays scene by scene. The voice uses your device's built-in reader.</p></section></section>`})()}
  <section class="grid2"><div class="card stack"><h2 class="h3">Terms</h2><dl class="terms">${l.terms.map(t=>`<dt>${esc(t[0])}</dt><dd>${esc(t[1])}</dd>`).join('')}</dl></div><div class="card stack visual"><h2 class="h3">Diagram or worked example</h2>${l.visual}</div></section>
  <section class="card stack prose"><h2 class="h3">On the job</h2>${l.apply}</section>
  <section class="card stack"><h2 class="h3">Find it in your book</h2><p><b>Task:</b> ${esc(l.lookup.task)}</p><ol class="tight">${l.lookup.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol><details><summary>Show answer</summary><p><b>${esc(l.lookup.answer)}</b> (${l.book==='CM'?'Concrete Manual, 2021 IBC / ACI 318-19 edition':'2018 IBC, first printing'})</p></details></section>
@@ -325,7 +344,7 @@ function vLesson(m,id){const l=LBY[id];const md=G.MODULES.find(x=>x.id===l.mod);
   rec(qid,o,'lesson',ms);S.lessons[id].ans=Object.assign({},S.lessons[id].ans,{[qid]:o});
   if(Object.keys(S.lessons[id].ans).length===qs.length&&!S.lessons[id].done){S.lessons[id].done=true;autoDone('lesson',id);const c=qs.filter(q=>S.lessons[id].ans[q.id]===q.a).length;log('lesson','Lesson '+id+' quiz',pct(c,qs.length));toast('Lesson complete');$('#lDone').textContent='Lesson complete ✓'}
   save();const k=qs.findIndex(q=>q.id===qid);card.outerHTML=qCard(QBY[qid],k,o,{fb:true});celebrate($('#lq'),qid,o);say(o===QBY[qid].a?'Correct':'Incorrect')};
- $('#lDone').onclick=()=>{S.lessons[id].done=true;autoDone('lesson',id);save();$('#lDone').textContent='Lesson complete ✓'}}
+ $('#lDone').onclick=()=>{S.lessons[id].done=true;autoDone('lesson',id);save();$('#lDone').textContent='Lesson complete ✓'};lessonPlayer(m,id)}
 
 /* ---------- Practice ---------- */
 function vPractice(m){if(S.run&&(S.run.kind==='quiz')){if(S.run.done)return resultView(m,'practice','all');return runView(m,'practice')}
